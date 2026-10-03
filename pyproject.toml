@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "marathon-ocr-core"
+version = "0.1.0"
+description = "Shared OCR engine — Visual Evidence Charter + Arabic corrections"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = ["pyyaml>=6.0"]
+
+[project.optional-dependencies]
+tesseract = ["pytesseract>=0.3.10", "pillow>=10.0"]
+paddle = ["paddleocr>=2.7"]
+surya = ["surya-ocr>=0.6"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ocr_core = ["rules/data/*.yaml", "postprocess/data/*.jsonl"]
