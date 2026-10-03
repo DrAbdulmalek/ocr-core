@@ -119,6 +119,28 @@ def test_r13_substitution_table(proc):
     yaml.safe_dump(cfg, fp, allow_unicode=True)
     fp.close()
 
+    # المحرك (v2) يحمّل ملف التطبيع الشقيق من مجلد ملف القواعد؛
+    # ننسخه إلى المجلد المؤقت حتى يعمل جدول R13 في ظروف العزل هذه.
+    import shutil
+    from pathlib import Path as _P
+    default_rules = OCRProcessor().rules_file
+    sibling = (
+        _P(default_rules).parent / "text_normalization_rules.yaml"
+    )
+    if _P(fp.name).parent != _P(default_rules).parent and sibling.exists():
+        shutil.copy(sibling, _P(fp.name).parent / sibling.name)
+        # العزل الحقيقي: المحرك (v2) يقرأ قواعد التنظيف من الملف الشقيق
+        # لا من الميثاق، فنعطّل R02/R09 هناك أيضاً وإلا بقي R09 يوحّد
+        # الألف ويُذيب ما كان R13MeaningToMany فصله.
+        norm_path = _P(fp.name).parent / sibling.name
+        with open(norm_path, encoding="utf-8") as nf:
+            norm_cfg = yaml.safe_load(nf) or {}
+        for r in norm_cfg.get("rules", []):
+            if r.get("id") in ("R02", "R09"):
+                r["enabled"] = False
+        with open(norm_path, "w", encoding="utf-8") as nf:
+            yaml.safe_dump(norm_cfg, nf, allow_unicode=True)
+
     isolated = OCRProcessor(rules_file=fp.name)
     out = isolated.process_text("ﻻ ﻷ ﻹ")["markdown"]
     assert "لا" in out and "لأ" in out and "لإ" in out
