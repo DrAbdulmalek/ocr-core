@@ -17,6 +17,7 @@ from pathlib import Path
 
 @dataclass
 class TestCase:
+    __test__ = False  # not a pytest test case (silences collection warning)
     """A single benchmark test case with ground truth and metadata."""
     id: str
     language: str  # "english", "arabic", "mixed"
