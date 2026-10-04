@@ -1,0 +1,12 @@
+# OCR Core Charter v2 - الميثاق التشغيلي
+version: "2.0"
+rules:
+  - id: ARABIC_MEDICAL_SANCTITY
+    description: "الأرقام الطبية والوحدات مقدسة، يمنع تصحيحها تلقائياً بواسطة LLM"
+    action: "guardrail"
+  - id: ENGINE_VOTING
+    description: "استخدام Tesseract + PaddleOCR + EasyOCR مع اختيار أعلى ثقة"
+    action: "ensemble"
+  - id: NO_DESTRUCTIVE_NORMALIZATION
+    description: "يمنع تحويل (ة) إلى (هـ) أو (ى) إلى (ي) في النص النهائي المصحح"
+    action: "strict"
