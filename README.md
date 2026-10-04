@@ -20,7 +20,7 @@
 
 | المسار | الوظيفة |
 |---|---|
-| `ocr_core.rules` | محرك قواعد الميثاق (18 قاعدة، charter_v2.yaml مدمج) |
+| `ocr_core.rules` | محرك قواعد الميثاق — الافتراضي المدمج: `ocr_core/config/marathon_ocr_rules.yaml` (ميثاق v2) مع pre-pass شقيق `text_normalization_rules.yaml` (18 قاعدة) |
 | `ocr_core.engines` | base (OCREngine/OCRResult) + tesseract + paddle + easyocr + ensemble + router |
 | `ocr_core.preprocess` | crop/deskew/rotate/enhance/normalize/dedup/text_dedup/pipeline |
 | `ocr_core.postprocess` | corrections_ar (311 زوجًا) + normalization + field_extractor + deduplication + medical_terms.json |
@@ -32,7 +32,7 @@
 
 ## التثبيت
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev,preprocess,benchmarks]"   # لتشغيل مجموعة الاختبارات كاملة (كما في CI)
 # optional engines / modules
 pip install -e ".[tesseract]"   # pytesseract
 pip install -e ".[paddle]"      # PaddleOCR
@@ -45,7 +45,8 @@ pip install -e ".[all]"         # الكل
 ## الاستخدام
 ```python
 from ocr_core.rules.engine import OCRProcessor
-p = OCRProcessor()  # يستخدم charter_v2.yaml المدمج
+p = OCRProcessor()  # الافتراضي: ocr_core/config/marathon_ocr_rules.yaml (ميثاق v2)
+# التجاوز: OCRProcessor(rules_file=...) أو المتغير البيئي MARATHON_OCR_RULES
 
 from ocr_core.engines.paddle import PaddleEngine
 r = PaddleEngine().process_image("scan.png")  # r.error عند غياب paddleocr
