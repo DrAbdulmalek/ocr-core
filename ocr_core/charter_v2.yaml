@@ -1,0 +1,19 @@
+# OCR Core Charter v2 - الميثاق التشغيلي
+# تمت مزامنته مع المصدر الرسمي في marathon_ted_pipeline
+# المرجع: https://github.com/DrAbdulmalek/marathon_ted_pipeline/blob/main/config/marathon_ocr_rules.yaml
+reference_sha: "08a7eb37c32a1b01e09f591e1e7486f0e9a920da"
+version: "2.0"
+
+rules:
+  - id: ARABIC_MEDICAL_SANCTITY
+    description: "الأرقام الطبية والوحدات مقدسة، يمنع تصحيحها تلقائياً بواسطة LLM (Visual Evidence Charter)"
+    action: "guardrail"
+  - id: ENGINE_VOTING
+    description: "استخدام Tesseract + PaddleOCR + EasyOCR مع اختيار أعلى ثقة"
+    action: "ensemble"
+  - id: NO_DESTRUCTIVE_NORMALIZATION
+    description: "يمنع تحويل (ة) إلى (هـ) أو (ى) إلى (ي) في النص النهائي المصحح"
+    action: "strict"
+  - id: VISUAL_EVIDENCE_REQUIRED
+    description: "نص OCR نظيف ليس دليلاً على صحته. الصحة تُستنتج من دليل بصري، وإلا فالنتيجة uncertain"
+    action: "guardrail"
