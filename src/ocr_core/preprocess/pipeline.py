@@ -25,6 +25,7 @@ def fix_scan(
     do_enhance: bool = True,
     # Enhancement options
     binarize: bool = False,
+    binarize_method: str = "adaptive",
     target_dpi: Optional[int] = 300,
     use_tesseract_osd: bool = False,
     deskew_method: str = "hough",
@@ -50,6 +51,8 @@ def fix_scan(
         do_deskew: Enable skew correction
         do_enhance: Enable OCR enhancement
         binarize: Convert to B&W (good for text-only pages)
+        binarize_method: "adaptive" (legacy default) | "otsu" | "sauvola" | "auto"
+                         — see enhance_for_ocr for the full trade-off table
         target_dpi: Target DPI for OCR (300 recommended)
         use_tesseract_osd: Use Tesseract for rotation detection (more accurate)
         deskew_method: "hough" or "projection"
@@ -112,7 +115,8 @@ def fix_scan(
             image,
             target_dpi=target_dpi if estimated_dpi else None,
             source_dpi=estimated_dpi,
-            binarize=binarize
+            binarize=binarize,
+            binarize_method=binarize_method
         )
         steps["enhanced"] = image.copy()
 

@@ -7,6 +7,35 @@
 > marathon-ocr-core[tesseract] @ git+https://github.com/DrAbdulmalek/ocr-core.git@v0.5.0
 > ```
 
+## غير مُصدر (فرع feat/algos-docs09)
+
+### أُضيف
+- **حزمة ثنائية مرجعية** (`preprocess/binarize.py`) من التعريفات المنشورة حصرًا:
+  - `otsu_threshold` / `binarize_otsu` — العتبة العالمية المُعظِّمة للتباين
+    بين الفئتين (Otsu 1979)، متجهة عبر cumsum لكل 256 عتبة، مع سقوط آمن
+    للصور الفارغة.
+  - `sauvola_thresholds` / `binarize_sauvola` — العتبة المحلية التكيفية
+    (Sauvola & Pietikäinen 2000) عبر **صور التكامل** بكلفة O(h·w) مستقلة
+    عن حجم النافذة — تتعامل مع الظلال والإضاءة غير المتجانسة التي تُسقط Otsu.
+  - `illumination_uniformity` + `binarize_auto` — موجّه تلقائي يقيس تذبذب
+    الإضاءة منخفض التردد (معامل تباين متوسطات كتل الصفحة) ويحوّل الصفحة:
+    مسح نظيف → Otsu، كاميرا بظلال → Sauvola (قاعدة docs/09 §2.2).
+  - كل الرياضيات numpy صرف؛ cv2 اختياري للتحويل الرمادي فقط.
+- **حزمة فك تسلسل CTC** (`decoding/ctc.py`) من التعريف المنشور حصرًا
+  (Graves et al., ICML 2006):
+  - `ctc_greedy_decode` — فك جشع O(T) (argmax → دمج التكرارات → حذف الفراغ).
+  - `ctc_greedy_decode_confident` — **ثقة لكل حرف** (متوسط posterior على
+    إطارات الحرف + نطاق الإطارات) لتلبية شرط §5.2-3 (علامات تحقق كهرمانية
+    في محرر المراجعة).
+  - `ctc_beam_search_decode` — بحث بادئات كلاسيكي (p_b/p_nb لكل بادئة،
+    إعادة تطبيع كل إطار، تقليم أعلى N فئة لكل إطار) — يتفوق على الجشع
+    عند التوزيعات الملتبسة.
+  - يقبل احتمالات مُطبّعة أو logits (softmax تلقائي مستقر عدديًا).
+- ربط في `enhance_for_ocr`/`fix_scan`: معامل `binarize_method`
+  ("adaptive" الافتراضي يحفظ سلوك الاستدعاءات القائمة | "otsu" | "sauvola" | "auto")
+  عبر `apply_binarization`.
+- اختبارات: `tests/test_binarize.py` (12 حالة) و`tests/test_ctc.py` (14 حالة).
+
 ## v0.5.0 (قادم — إصدار عقد الاستهلاك المركزي)
 
 هذا الإصدار هو المرجع الذي تعقد عليه المستودعات المستهلكة (intelli-file-manager وغيرها)
