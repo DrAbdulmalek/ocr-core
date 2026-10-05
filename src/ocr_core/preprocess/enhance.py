@@ -3,7 +3,8 @@ enhance.py
 Prepares scanned images for OCR by:
 - Denoising
 - Contrast enhancement (CLAHE)
-- Binarization (optional)
+- Binarization (optional — four families: legacy adaptive Gaussian,
+  Otsu global, Sauvola adaptive, auto-routed)
 - DPI normalization
 
 Handles both color and grayscale scans.
@@ -13,6 +14,8 @@ import cv2
 import numpy as np
 from typing import Optional
 
+from .binarize import binarize_otsu, binarize_sauvola, binarize_auto
+
 
 def enhance_for_ocr(
     image: np.ndarray,
@@ -21,6 +24,7 @@ def enhance_for_ocr(
     denoise: bool = True,
     enhance_contrast: bool = True,
     binarize: bool = False,
+    binarize_method: str = "adaptive",
     sharpen: bool = True
 ) -> np.ndarray:
     """
@@ -33,6 +37,15 @@ def enhance_for_ocr(
         denoise: Apply denoising filter
         enhance_contrast: Apply CLAHE contrast enhancement
         binarize: Convert to binary black/white (best for pure text, bad for forms/images)
+        binarize_method: Which binarization family to use when binarize=True:
+            - "adaptive" (default, legacy behavior): OpenCV adaptive Gaussian —
+              kept so existing callers never change output.
+            - "otsu": global threshold maximizing between-class variance
+              (Otsu 1979) — best on flat clean scans.
+            - "sauvola": adaptive local threshold via integral images
+              (Sauvola 2000) — robust to shadows and lighting gradients.
+            - "auto": measures illumination uniformity and routes the page
+              to otsu or sauvola (docs/09 §2.2 decision rule).
         sharpen: Apply sharpening filter
 
     Returns:
@@ -58,9 +71,34 @@ def enhance_for_ocr(
 
     # Step 5: Binarize (optional — only for pure text documents)
     if binarize:
-        result = adaptive_binarize(result)
+        result = apply_binarization(result, binarize_method)
 
     return result
+
+
+def apply_binarization(image: np.ndarray, method: str = "adaptive") -> np.ndarray:
+    """
+    Dispatch to a binarization family by name.
+
+    Args:
+        image: Input image (BGR or grayscale)
+        method: "adaptive" | "otsu" | "sauvola" | "auto"
+
+    Returns:
+        Binary image (grayscale, 0 or 255)
+    """
+    if method == "adaptive":
+        return adaptive_binarize(image)
+    if method == "otsu":
+        return binarize_otsu(image)
+    if method == "sauvola":
+        return binarize_sauvola(image)
+    if method == "auto":
+        return binarize_auto(image)["image"]  # type: ignore[index]
+    raise ValueError(
+        f"unknown binarize_method {method!r} — "
+        "expected one of: adaptive, otsu, sauvola, auto"
+    )
 
 
 def remove_noise(image: np.ndarray) -> np.ndarray:
