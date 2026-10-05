@@ -17,6 +17,7 @@ from .binarize import (
     binarize_otsu,
     binarize_sauvola,
     illumination_uniformity,
+    ink_contrast,
     binarize_auto,
 )
 
@@ -35,5 +36,6 @@ __all__ = [
     "binarize_otsu",
     "binarize_sauvola",
     "illumination_uniformity",
+    "ink_contrast",
     "binarize_auto",
 ]

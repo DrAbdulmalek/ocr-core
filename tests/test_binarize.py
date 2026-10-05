@@ -20,6 +20,7 @@ from ocr_core.preprocess.binarize import (
     binarize_otsu,
     binarize_sauvola,
     illumination_uniformity,
+    ink_contrast,
     otsu_threshold,
     sauvola_thresholds,
     to_grayscale,
@@ -45,6 +46,17 @@ def _shadow_text_page(w: int = 400, h: int = 300) -> np.ndarray:
     for y in range(40, h - 40, 24):
         img[y: y + 4, 40: w - 40] = 25
     return img
+
+
+def _low_contrast_text_page(w: int = 400, h: int = 300) -> np.ndarray:
+    """Faded-ink scan matching the golden-sample `low_contrast` condition:
+    mid-grey ink (118) on light-grey paper (238), uniformly lit.
+
+    illumination_uniformity is near zero here — that is the documented
+    routing hole: lighting looks flat, so the old auto router picked
+    Otsu and paid a 6× CER penalty (docs/GOLDEN-SAMPLE.md §6.3).
+    """
+    return _flat_text_page(w=w, h=h, bg=238, ink=118)
 
 
 # ─── Otsu ────────────────────────────────────────────────────────────────────
@@ -180,10 +192,39 @@ def test_auto_routes_shadowed_page_to_sauvola():
     assert result["threshold"] is None  # per-pixel map, not one number
 
 
+def test_ink_contrast_faded_ink_below_dark_ink():
+    high = ink_contrast(_flat_text_page())
+    low = ink_contrast(_low_contrast_text_page())
+    assert high > 0.70
+    assert low < 0.55
+    assert low < high / 1.3
+
+
+def test_ink_contrast_uniform_page_is_zero():
+    assert ink_contrast(np.full((64, 64), 200, dtype=np.uint8)) == 0.0
+
+
+def test_auto_routes_low_contrast_to_sauvola():
+    """The golden-sample gap: faded ink, flat lighting → Sauvola, not Otsu.
+
+    illumination_uniformity stays well below the 0.12 lighting limit, so
+    only the new ink-contrast rule can make this decision.
+    """
+    img = _low_contrast_text_page()
+    assert illumination_uniformity(img) < 0.12
+    result = binarize_auto(img)
+    assert result["method"] == "sauvola"
+    assert result["ink_contrast"] < 0.55
+    assert result["threshold"] is None
+
+
 def test_auto_metadata_shape():
     result = binarize_auto(_flat_text_page())
-    assert {"image", "method", "illumination_ratio", "threshold"} == set(result.keys())
+    assert {
+        "image", "method", "illumination_ratio", "ink_contrast", "threshold"
+    } == set(result.keys())
     assert 0.0 <= result["illumination_ratio"] <= 1.0
+    assert 0.0 <= result["ink_contrast"] <= 1.0
     assert result["image"].dtype == np.uint8
 
 
