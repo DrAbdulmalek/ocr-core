@@ -10,17 +10,36 @@ def _surya_installed() -> bool:
     return importlib.util.find_spec("surya") is not None
 
 
-def test_surya_not_installed_graceful():
-    """عند غياب surya: رسالة واضحة عبر OCRResult.error — بلا استثناء."""
+def test_surya_not_installed_graceful(tmp_path):
+    """عند غياب surya: رسالة واضحة عبر OCRResult.error — بلا استثناء.
+
+    نستخدم ملفًا حقيقيًا (وليس مسارًا وهميًا) لأن process_image يفحص وجود
+    الملف قبل بوابة التوفر عمدًا — فمسار وهمي يعيد "file not found" في
+    البيئات بلا surya (كما كشف CI) ولا يصل أبدًا لرسالة غياب المحرك.
+    """
+    from ocr_core.engines.surya_engine import SuryaEngine
+
+    if _surya_installed():
+        pytest.skip("surya مثبت — لا يمكن محاكاة الغياب هنا")
+    real = tmp_path / "real.png"
+    real.write_bytes(b"")  # الملف موجود → الفحص الأول يمر → بوابة التوفر تُرجع رسالة surya
+    engine = SuryaEngine()
+    assert engine.is_available() is False
+    r = engine.process_image(str(real))
+    assert r.error is not None
+    assert "surya" in r.error.lower()
+
+
+def test_file_check_precedes_availability_gate():
+    """توثيق ترتيب الفحوص: بلا surya + ملف غير موجود → "file not found" (الفحص الأول)."""
     from ocr_core.engines.surya_engine import SuryaEngine
 
     if _surya_installed():
         pytest.skip("surya مثبت — لا يمكن محاكاة الغياب هنا")
     engine = SuryaEngine()
-    assert engine.is_available() is False
     r = engine.process_image("whatever.png")
     assert r.error is not None
-    assert "surya" in r.error.lower()
+    assert "file not found" in r.error
 
 
 def test_is_available_static_bool():
