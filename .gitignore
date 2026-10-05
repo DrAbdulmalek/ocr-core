@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# golden-sample local run artifacts (environment-only; regenerate via the CLI)
+.local-fonts/
+.local-tessdata/
+.local-golden-smoke/
