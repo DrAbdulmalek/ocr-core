@@ -3,6 +3,10 @@
 Needs the ``tesseract`` binary on PATH plus pytesseract + Pillow.
 PDF support additionally uses pymupdf to rasterize pages.
 Engine-level failures are reported via ``OCRResult.error`` — never raised.
+
+Arabic + English by default (``lang="ara+eng"``). Bundled tessdata models
+(Apache-2.0, see ``ocr_core/resources/tessdata_fast/PROVENANCE.md``) are
+auto-discovered and passed via ``--tessdata-dir`` — no global install needed.
 """
 from __future__ import annotations
 
@@ -15,14 +19,43 @@ from typing import Optional
 
 from ocr_core.engines.base import OCRResult, OCREngine
 
+_BUNDLED_TESSDATA = (
+    Path(__file__).resolve().parent.parent / "resources" / "tessdata_fast"
+)
+
 
 class TesseractEngine(OCREngine):
     name = "tesseract"
 
-    def __init__(self, lang: str = "ara+eng", psm: str = "6", dpi: int = 200):
+    def __init__(
+        self,
+        lang: str = "ara+eng",
+        psm: str = "6",
+        dpi: int = 200,
+        tessdata_dir: Optional[str] = None,
+    ):
         self.lang = lang
         self.psm = psm
         self.dpi = dpi
+        self.tessdata_dir = tessdata_dir or self._bundled_tessdata_dir()
+
+    @staticmethod
+    def _bundled_tessdata_dir() -> Optional[str]:
+        """Bundled Apache-2.0 models (ara+eng), only if they actually exist."""
+        try:
+            if (_BUNDLED_TESSDATA / "ara.traineddata").is_file() and (
+                _BUNDLED_TESSDATA / "eng.traineddata"
+            ).is_file():
+                return str(_BUNDLED_TESSDATA)
+        except OSError:
+            pass
+        return None
+
+    def _config(self) -> str:
+        cfg = f"--psm {self.psm}"
+        if self.tessdata_dir:
+            cfg += f" --tessdata-dir {self.tessdata_dir}"
+        return cfg
 
     def available(self) -> bool:
         return shutil.which("tesseract") is not None
@@ -45,7 +78,7 @@ class TesseractEngine(OCREngine):
             from PIL import Image
 
             text = pytesseract.image_to_string(
-                Image.open(path), lang=self.lang, config=f"--psm {self.psm}"
+                Image.open(path), lang=self.lang, config=self._config()
             )
         except Exception as exc:  # engine failure -> reported, never raised
             return OCRResult(engine=self.name, error=f"{type(exc).__name__}: {exc}")
@@ -54,7 +87,11 @@ class TesseractEngine(OCREngine):
             engine=self.name,
             confidence=0.0,  # never invented
             processing_time=time.perf_counter() - start,
-            meta={"lang": self.lang, "psm": self.psm},
+            meta={
+                "lang": self.lang,
+                "psm": self.psm,
+                "tessdata_dir": self.tessdata_dir,
+            },
         )
 
     def process_pdf(self, pdf_path, max_pages: Optional[int] = None) -> OCRResult:
@@ -88,7 +125,12 @@ class TesseractEngine(OCREngine):
                 confidence=0.0,  # never invented
                 processing_time=time.perf_counter() - start,
                 pages=n,
-                meta={"lang": self.lang, "psm": self.psm, "dpi": self.dpi},
+                meta={
+                    "lang": self.lang,
+                    "psm": self.psm,
+                    "dpi": self.dpi,
+                    "tessdata_dir": self.tessdata_dir,
+                },
             )
         except Exception as exc:
             return OCRResult(engine=self.name, error=f"{type(exc).__name__}: {exc}")

@@ -24,4 +24,4 @@ dev = ["pytest>=8.0", "ruff>=0.6"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-ocr_core = ["rules/data/*.yaml", "postprocess/data/*.jsonl", "postprocess/data/*.json", "config/*.yaml"]
+ocr_core = ["rules/data/*.yaml", "postprocess/data/*.jsonl", "postprocess/data/*.json", "config/*.yaml", "resources/tessdata_fast/*.traineddata", "resources/tessdata_fast/*.md"]
