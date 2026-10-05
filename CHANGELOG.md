@@ -7,6 +7,27 @@
 > marathon-ocr-core[tesseract] @ git+https://github.com/DrAbdulmalek/ocr-core.git@v0.5.0
 > ```
 
+## غير مُصدر (فرع feat/golden-sample-cer)
+
+### أُضيف
+- **العينة الذهبية الموحدة** (`benchmarks/golden/`) — تنفيذ البند الأول من
+  خارطة docs/09 §6: 32 زوجاً عربي/إنجليزي أصلياً حتمي التوليد (بلا صور
+  مخزنة) × 4 متغيرات ثنائية (raw/otsu/sauvola/auto) × المحركات المتاحة
+  بنفس التطبيع (`arabic_strong_normalize` على الطرفين) — أول جدول CER
+  مقارن مملوك لنا (`docs/GOLDEN-SAMPLE.md` + `docs/golden-sample-2026-10-05/`).
+  نتائج الجولة الأولى (Tesseract 5.5.0، نماذج tessdata_fast الموثقة):
+  Sauvola الأفضل شمولاً (CER 0.198 مقابل 0.307 خام)؛ انهيار Otsu على
+  الظل أُعيد إنتاجه قياسياً (0.553 أسوأ من الخام 0.535) وSauvola/auto
+  يخفضانه 54%؛ الموجّه auto وجّه الظل صحيحاً وفوّت التباين المنخفض
+  (فجوة موثقة بمقاييس).
+- رندر عربي عبر **libraqm/HarfBuzz** (نص منطقي خام، RTL طبيعي) — يصل
+  CER إلى 0.0000 على الصفحات النظيفة، مقابل ~0.80 معكوس الترتيب مع مسار
+  reshaper+bidi الكلاسيكي (موثق في `docs/GOLDEN-SAMPLE.md` §3).
+- خط Noto Naskh Arabic مرفق داخل الحزمة (رخصة SIL OFL 1.1 —
+  `benchmarks/golden/fonts/`) لضمان حتمية الرندر عبر البيئات.
+- إضافة `golden` إلى `optional-dependencies` (arabic-reshaper +
+  python-bidi) وتثبيتها في CI.
+
 ## غير مُصدر (فرع feat/algos-docs09)
 
 ### أُضيف
