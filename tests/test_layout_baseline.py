@@ -18,7 +18,7 @@ def test_projection_analyzer_detects_bands_in_pixel_coordinates():
         [255, 20, 20, 255, 255, 255],
         [255, 20, 20, 255, 255, 255],
         [255, 255, 255, 255, 255, 255],
-        [255, 255, 255, 255, 255],
+        [255, 255, 255, 255, 255, 255],
         [255, 10, 255, 255, 10, 255],
     ]
     result = ProjectionLayoutAnalyzer(
