@@ -133,6 +133,11 @@ def test_legacy_analysis_provenance_without_run_identity_remains_readable():
     assert restored.analysis_run_id is None
 
 
+def test_analysis_provenance_rejects_blank_run_identity():
+    with pytest.raises(ValueError, match="analysis_run_id"):
+        AnalysisProvenance("test-analyzer", "1.0", "cfg-a", "image-1", analysis_run_id="  ")
+
+
 def test_hypothesis_id_is_an_analysis_scoped_compatibility_alias():
     item = hypothesis("h-001")
     assert item.hypothesis_id == item.region_id
