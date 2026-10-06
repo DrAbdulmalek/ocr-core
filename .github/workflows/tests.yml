@@ -19,3 +19,19 @@ jobs:
           pip install -e ".[preprocess,benchmarks,golden]" pytest
       - name: Run tests
         run: pytest -q
+
+  ui-import:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install optional UI
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[ui]" pytest
+      - name: Verify UI import and models
+        run: pytest -q tests/test_ui_models.py tests/test_ui_import_optional.py
