@@ -32,6 +32,13 @@ def test_analysis_result_is_deterministically_ordered_and_serializable():
     assert LayoutAnalysisResult.from_dict(result.to_dict()) == result
 
 
+def test_analysis_result_rejects_duplicate_region_ids():
+    with pytest.raises(ValueError, match="duplicate region_id"):
+        LayoutAnalysisResult.from_hypotheses(
+            provenance(), [hypothesis("same"), hypothesis("same")]
+        )
+
+
 @pytest.mark.parametrize(
     "bbox",
     [(0, 0, math.nan, 1), (0, 0, math.inf, 1), (0, 0, -1, 1)],
@@ -91,3 +98,10 @@ def test_missing_manual_region_is_a_conflict_not_a_deletion():
     reconciliation = reconcile(document(existing), LayoutAnalysisResult(provenance(), ()))
     assert reconciliation.items[0].action is ReconciliationAction.CONFLICT
     assert "manually edited" in reconciliation.items[0].reason
+
+
+def test_reconcile_rejects_duplicate_document_region_ids():
+    first = MedicalRegionData(region_id="same", bbox=(1, 2, 10, 8))
+    second = MedicalRegionData(region_id="same", bbox=(4, 5, 10, 8))
+    with pytest.raises(ValueError, match="duplicate region_id"):
+        reconcile(document(first, second), LayoutAnalysisResult(provenance(), ()))
