@@ -15,6 +15,8 @@
 - [x] Benchmarks: suite كاملة + ci_suite (بوابات CER/WER، A/B) (PR #6)
 - [x] التكامل مع marathon_ted_pipeline (PR #14 مدموج — shim + pin)
 - [ ] التكامل الكامل مع omni-medical-suite (استهلاك ocr-core بدل المكررات)
+- [ ] Medical Region Editor UI (PR in progress) — optional PySide6 extra: `pip install -e ".[ui]"`
+
 
 ## الوحدات
 

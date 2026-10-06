@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "marathon-ocr-core"
-version = "0.5.0"
+version = "0.6.0"
 description = "Shared OCR engine — Visual Evidence Charter + Arabic corrections"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -20,6 +20,8 @@ benchmarks = ["rapidfuzz>=3.6", "pyyaml>=6.0", "click>=8.1", "rich>=13.0"]
 golden = ["arabic-reshaper>=3.0", "python-bidi>=0.4.2", "pillow>=10.0", "numpy>=1.24"]
 all = ["pytesseract>=0.3.10", "pillow>=10.0", "paddleocr>=2.7", "numpy>=1.24", "easyocr>=1.7", "opencv-python-headless>=4.8", "imagehash>=4.3", "rapidfuzz>=3.6", "click>=8.1", "rich>=13.0", "arabic-reshaper>=3.0", "python-bidi>=0.4.2"]
 dev = ["pytest>=8.0", "ruff>=0.6"]
+ui = ["PySide6>=6.5"]
+ui-dev = ["PySide6>=6.5", "pytest-qt>=4.4"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
