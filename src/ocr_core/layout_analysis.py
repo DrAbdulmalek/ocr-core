@@ -176,7 +176,12 @@ def reconcile(
     Matching is by persisted region_id only. Cross-run semantic matching is
     deliberately not inferred from geometry, type, or list position.
     """
-    existing = {region.region_id: region for region in document.regions}
+    existing: dict[str, MedicalRegionData] = {}
+    for region in document.regions:
+        if region.region_id in existing:
+            raise ValueError(f"document contains duplicate region_id: {region.region_id}")
+        existing[region.region_id] = region
+
     proposed = {item.region_id: item for item in analysis.hypotheses}
     items: list[ReconciliationItem] = []
 
