@@ -32,6 +32,7 @@ class AnalysisProvenance:
     analyzer_version: str
     configuration_id: str
     source_id: str
+    analysis_run_id: str | None = None
 
     def __post_init__(self) -> None:
         if not all(
