@@ -7,7 +7,7 @@ from PySide6.QtGui import QKeySequence, QPainter, QPixmap
 from PySide6.QtWidgets import QGraphicsView, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from .graphics_scene import MedicalGraphicsScene
-from .models import LayoutDocument, MedicalRegionData
+from .models import LayoutDocument
 
 
 class RegionEditorWidget(QWidget):
@@ -21,9 +21,14 @@ class RegionEditorWidget(QWidget):
         super().__init__(parent)
         self.scene = MedicalGraphicsScene(self)
         self.view = QGraphicsView(self.scene, self)
-        self.view.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)
+        self.view.setRenderHints(
+            QPainter.RenderHint.Antialiasing
+            | QPainter.RenderHint.SmoothPixmapTransform
+        )
         self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
-        self.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.view.setTransformationAnchor(
+            QGraphicsView.ViewportAnchor.AnchorUnderMouse
+        )
         self._document: LayoutDocument | None = None
 
         toolbar = QHBoxLayout()
@@ -42,9 +47,7 @@ class RegionEditorWidget(QWidget):
 
     def set_document(self, document: LayoutDocument, image: QPixmap) -> None:
         self._document = document
-        self.scene.set_document_image(image)
-        for region in document.regions:
-            self.scene.add_region(region)
+        self.scene.set_document(document, image)
 
     def document(self) -> LayoutDocument | None:
         return self._document
@@ -54,16 +57,49 @@ class RegionEditorWidget(QWidget):
             self.save_requested.emit()
             event.accept()
             return
-        if event.key() == Qt.Key.Key_R and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            selected = [item for item in self.scene.selectedItems() if hasattr(item, "region_id")]
+
+        if (
+            event.key() == Qt.Key.Key_R
+            and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            selected = [
+                item
+                for item in self.scene.selectedItems()
+                if hasattr(item, "region_id")
+            ]
             if selected:
                 self.reocr_requested.emit(selected[0].region_id)
             event.accept()
             return
-        if event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab):\n            items = sorted((item for item in self.scene.region_items.values()), key=lambda item: (item.scene_rect().top(), item.scene_rect().left()))\n            if items:\n                current = self.scene.selectedItems()[0] if self.scene.selectedItems() else None\n                step = -1 if event.key() == Qt.Key.Key_Backtab else 1\n                index = items.index(current) if current in items else (-1 if step > 0 else 0)\n                items[(index + step) % len(items)].setSelected(True)\n                event.accept()\n                return\n        if event.key() == Qt.Key.Key_Delete:
-            selected = [item for item in self.scene.selectedItems() if hasattr(item, "region_id")]
+
+        if event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
+            items = sorted(
+                self.scene.region_items.values(),
+                key=lambda item: (
+                    item.scene_rect().top(),
+                    item.scene_rect().left(),
+                ),
+            )
+            if items:
+                current = self.scene.selectedItems()[0] if self.scene.selectedItems() else None
+                step = -1 if event.key() == Qt.Key.Key_Backtab else 1
+                index = items.index(current) if current in items else (
+                    -1 if step > 0 else 0
+                )
+                self.scene.clearSelection()
+                items[(index + step) % len(items)].setSelected(True)
+                event.accept()
+                return
+
+        if event.key() == Qt.Key.Key_Delete:
+            selected = [
+                item
+                for item in self.scene.selectedItems()
+                if hasattr(item, "region_id")
+            ]
             for item in selected:
                 self.scene.remove_region(item.region_id)
             event.accept()
             return
+
         super().keyPressEvent(event)
