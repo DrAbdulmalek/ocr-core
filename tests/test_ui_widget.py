@@ -36,5 +36,9 @@ def test_editor_binds_regions_to_document(qtbot):
     editor.scene.region_items["r1"].set_region_type(RegionType.CLINICAL_SECTION.value)
     assert document.regions[0].region_type is RegionType.CLINICAL_SECTION
 
+    item = editor.scene.region_items["r1"]
+    item.setPos(35, 45)
+    assert document.regions[0].bbox[:2] == (55.0, 75.0)
+
     editor.scene.remove_region("r1")
     assert document.regions == []
