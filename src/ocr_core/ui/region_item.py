@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QBrush, QPen, QPainter
-from PySide6.QtWidgets import QGraphicsObject, QMenu
+from PySide6.QtWidgets import QGraphicsItem, QGraphicsObject, QMenu
 
 from .models import RegionType
 
