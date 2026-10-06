@@ -40,14 +40,21 @@ class AnalysisProvenance:
             for value in (self.analyzer, self.analyzer_version, self.configuration_id, self.source_id)
         ):
             raise ValueError("analysis provenance fields are required")
+        if self.analysis_run_id is not None and (
+            not isinstance(self.analysis_run_id, str) or not self.analysis_run_id.strip()
+        ):
+            raise ValueError("analysis_run_id must be a non-empty string when provided")
 
     def to_dict(self) -> dict[str, str]:
-        return {
+        payload = {
             "analyzer": self.analyzer,
             "analyzer_version": self.analyzer_version,
             "configuration_id": self.configuration_id,
             "source_id": self.source_id,
         }
+        if self.analysis_run_id is not None:
+            payload["analysis_run_id"] = self.analysis_run_id
+        return payload
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> "AnalysisProvenance":
@@ -56,6 +63,11 @@ class AnalysisProvenance:
             analyzer_version=str(payload["analyzer_version"]),
             configuration_id=str(payload["configuration_id"]),
             source_id=str(payload["source_id"]),
+            analysis_run_id=(
+                str(payload["analysis_run_id"])
+                if payload.get("analysis_run_id") is not None
+                else None
+            ),
         )
 
 
@@ -75,6 +87,11 @@ class RegionHypothesis:
         bbox = tuple(float(value) for value in self.bbox)
         _validate_bbox(bbox)  # type: ignore[arg-type]
         object.__setattr__(self, "bbox", bbox)
+
+    @property
+    def hypothesis_id(self) -> str:
+        """Analysis-scoped compatibility alias for the existing hypothesis ID."""
+        return self.region_id
 
     def to_dict(self) -> dict[str, Any]:
         return {
