@@ -132,6 +132,14 @@ class MedicalRegionItem(QGraphicsObject):
         )
         super().mouseReleaseEvent(event)
 
+    def itemChange(self, change, value):
+        result = super().itemChange(change, value)
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+            self.region_updated.emit(
+                self.region_id, self.scene_rect(), self.region_type.value
+            )
+        return result
+
     def scene_rect(self) -> QRectF:
         return self.mapRectToScene(self._rect).normalized()
 
