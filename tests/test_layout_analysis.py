@@ -105,3 +105,39 @@ def test_reconcile_rejects_duplicate_document_region_ids():
     second = MedicalRegionData(region_id="same", bbox=(4, 5, 10, 8))
     with pytest.raises(ValueError, match="duplicate region_id"):
         reconcile(document(first, second), LayoutAnalysisResult(provenance(), ()))
+
+
+def test_analysis_provenance_preserves_explicit_run_identity():
+    value = provenance()
+    value = AnalysisProvenance(
+        value.analyzer,
+        value.analyzer_version,
+        value.configuration_id,
+        value.source_id,
+        analysis_run_id="run-001",
+    )
+    restored = AnalysisProvenance.from_dict(value.to_dict())
+    assert restored == value
+    assert restored.analysis_run_id == "run-001"
+
+
+def test_legacy_analysis_provenance_without_run_identity_remains_readable():
+    restored = AnalysisProvenance.from_dict(
+        {
+            "analyzer": "test-analyzer",
+            "analyzer_version": "1.0",
+            "configuration_id": "cfg-a",
+            "source_id": "image-1",
+        }
+    )
+    assert restored.analysis_run_id is None
+
+
+def test_analysis_provenance_rejects_blank_run_identity():
+    with pytest.raises(ValueError, match="analysis_run_id"):
+        AnalysisProvenance("test-analyzer", "1.0", "cfg-a", "image-1", analysis_run_id="  ")
+
+
+def test_hypothesis_id_is_an_analysis_scoped_compatibility_alias():
+    item = hypothesis("h-001")
+    assert item.hypothesis_id == item.region_id
