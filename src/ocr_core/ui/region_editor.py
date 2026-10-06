@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QKeySequence, QPixmap
+from PySide6.QtGui import QKeySequence, QPainter, QPixmap
 from PySide6.QtWidgets import QGraphicsView, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from .graphics_scene import MedicalGraphicsScene
@@ -21,7 +21,7 @@ class RegionEditorWidget(QWidget):
         super().__init__(parent)
         self.scene = MedicalGraphicsScene(self)
         self.view = QGraphicsView(self.scene, self)
-        self.view.setRenderHints(self.view.renderHints())
+        self.view.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)
         self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         self.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self._document: LayoutDocument | None = None
@@ -60,7 +60,7 @@ class RegionEditorWidget(QWidget):
                 self.reocr_requested.emit(selected[0].region_id)
             event.accept()
             return
-        if event.key() == Qt.Key.Key_Delete:
+        if event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab):\n            items = sorted((item for item in self.scene.region_items.values()), key=lambda item: (item.scene_rect().top(), item.scene_rect().left()))\n            if items:\n                current = self.scene.selectedItems()[0] if self.scene.selectedItems() else None\n                step = -1 if event.key() == Qt.Key.Key_Backtab else 1\n                index = items.index(current) if current in items else (-1 if step > 0 else 0)\n                items[(index + step) % len(items)].setSelected(True)\n                event.accept()\n                return\n        if event.key() == Qt.Key.Key_Delete:
             selected = [item for item in self.scene.selectedItems() if hasattr(item, "region_id")]
             for item in selected:
                 self.scene.remove_region(item.region_id)
