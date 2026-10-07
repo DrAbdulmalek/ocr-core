@@ -127,6 +127,12 @@ def make_observation(
     failure_message: str | None = None,
 ) -> AnalyzerObservation:
     """Validate and wrap an analysis result without mutation."""
-    observation = AnalyzerObservation(\n        result=result,\n        quality=quality,\n        status=status,\n        failure_code=failure_code,\n        failure_message=failure_message,\n    )
+    observation = AnalyzerObservation(
+        result=result,
+        quality=quality,
+        status=status,
+        failure_code=failure_code,
+        failure_message=failure_message,
+    )
     validate_analyzer_result(observation)
     return observation
