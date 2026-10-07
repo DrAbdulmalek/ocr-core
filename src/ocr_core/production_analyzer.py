@@ -59,12 +59,21 @@ class AnalyzerObservation:
     result: LayoutAnalysisResult
     quality: tuple[AnalyzerQuality, ...] = ()
     status: str = "complete"
+    failure_code: str | None = None
+    failure_message: str | None = None
 
     def __post_init__(self) -> None:
-        if self.status not in {"complete", "empty", "degraded"}:
-            raise ValueError("status must be complete, empty, or degraded")
+        if self.status not in {"complete", "empty", "degraded", "failed"}:
+            raise ValueError("status must be complete, empty, degraded, or failed")
         if self.status == "empty" and self.result.hypotheses:
             raise ValueError("empty observation cannot contain hypotheses")
+        if self.status == "failed":
+            if not self.failure_code or not self.failure_code.strip():
+                raise ValueError("failed observation requires failure_code")
+            if not self.failure_message or not self.failure_message.strip():
+                raise ValueError("failed observation requires failure_message")
+        elif self.failure_code is not None or self.failure_message is not None:
+            raise ValueError("failure metadata is only valid for failed observations")
 
     @property
     def provenance(self) -> AnalysisProvenance:
@@ -75,6 +84,8 @@ class AnalyzerObservation:
             "result": self.result.to_dict(),
             "quality": [item.to_dict() for item in self.quality],
             "status": self.status,
+            "failure_code": self.failure_code,
+            "failure_message": self.failure_message,
         }
 
     @classmethod
@@ -83,6 +94,8 @@ class AnalyzerObservation:
             result=LayoutAnalysisResult.from_dict(data["result"]),
             quality=tuple(AnalyzerQuality.from_dict(item) for item in data.get("quality", [])),
             status=str(data.get("status", "complete")),
+            failure_code=(str(data["failure_code"]) if data.get("failure_code") is not None else None),
+            failure_message=(str(data["failure_message"]) if data.get("failure_message") is not None else None),
         )
 
 
