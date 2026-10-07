@@ -4,11 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "marathon-ocr-core"
-version = "0.6.0"
-description = "Shared OCR engine — Visual Evidence Charter + Arabic corrections"
+version = "0.7.0"
+description = "Shared OCR engine — Visual Evidence Charter + Arabic corrections + unified command system"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 dependencies = ["pyyaml>=6.0"]
+
+[project.scripts]
+ocr-core = "ocr_core.commands.adapters.cli:main"
 
 [project.optional-dependencies]
 tesseract = ["pytesseract>=0.3.10", "pillow>=10.0"]
@@ -18,7 +21,21 @@ easyocr = ["easyocr>=1.7", "pillow>=10.0", "numpy>=1.24"]
 preprocess = ["opencv-python-headless>=4.8", "pillow>=10.0", "numpy>=1.24", "imagehash>=4.3", "rapidfuzz>=3.6"]
 benchmarks = ["rapidfuzz>=3.6", "pyyaml>=6.0", "click>=8.1", "rich>=13.0"]
 golden = ["arabic-reshaper>=3.0", "python-bidi>=0.4.2", "pillow>=10.0", "numpy>=1.24"]
-all = ["pytesseract>=0.3.10", "pillow>=10.0", "paddleocr>=2.7", "numpy>=1.24", "easyocr>=1.7", "opencv-python-headless>=4.8", "imagehash>=4.3", "rapidfuzz>=3.6", "click>=8.1", "rich>=13.0", "arabic-reshaper>=3.0", "python-bidi>=0.4.2"]
+# كشف الكلمات في الخط اليدوي (المرحلة 1) — الكاشف الدقيق ONNX
+# (يرث [preprocess] لأن حزمة ocr_core.preprocess تستورد cv2 في __init__؛
+#  كاشفا projection/heuristic نفسها لا تحتاج سوى numpy+pillow)
+word-detect = ["marathon-ocr-core[preprocess]", "onnxruntime>=1.17", "huggingface_hub>=0.20"]
+# jina-ocr-v1 — محرك VLM للمستندات الكاملة (المرحلة 4)
+# ⚠️ ترخيص الأوزان: CC BY-NC 4.0 (غير تجاري) — الكود هنا MIT،
+#    الأوزان تُحمّل وقت التشغيل من HuggingFace.
+jina = ["torch>=2.2", "transformers>=4.45", "torchvision>=0.17", "accelerate>=0.29", "safetensors>=0.4", "pillow>=10.0"]
+# مزيج VLM الموصى به (jina + PDF→صور + تصدير DOCX لأوامر commands)
+vlm = ["marathon-ocr-core[jina]", "pymupdf>=1.23", "python-docx>=1.1"]
+pdf = ["pymupdf>=1.23"]
+docx = ["python-docx>=1.1"]
+# ⚠️ all لا يتضمن jina/surya/word-detect — تراخيص أوزان أو تبعيات ثقيلة
+#    يختارها المستخدم صراحةً.
+all = ["pytesseract>=0.3.10", "pillow>=10.0", "paddleocr>=2.7", "numpy>=1.24", "easyocr>=1.7", "opencv-python-headless>=4.8", "imagehash>=4.3", "rapidfuzz>=3.6", "click>=8.1", "rich>=13.0", "arabic-reshaper>=3.0", "python-bidi>=0.4.2", "pymupdf>=1.23", "python-docx>=1.1"]
 dev = ["pytest>=8.0", "ruff>=0.6"]
 ui = ["PySide6>=6.5"]
 ui-dev = ["PySide6>=6.5", "pytest-qt>=4.4"]
