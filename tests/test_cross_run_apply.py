@@ -269,3 +269,54 @@ def test_apply_result_is_serializable_and_deterministic():
     assert payload["analysis_run_id"] == "run-1"
     assert payload["matching_policy_id"] == "geometry-iou-v1"
     assert payload["applied"][0]["persistent_region_id"] == "persistent-1"
+
+
+def test_ambiguous_can_be_explicitly_resolved_with_reason():
+    region = MedicalRegionData(region_id="persistent-1", bbox=(0, 0, 10, 10), is_manually_edited=False)
+    hypothesis = RegionHypothesis("hyp-1", RegionType.CLINICAL_SECTION, (0, 0, 10, 10))
+    reconciliation = CrossRunReconciliationResult(
+        _analysis(hypothesis),
+        CrossRunMatchingConfig(),
+        (_candidate("hyp-1", "persistent-1", CrossRunMatchState.AMBIGUOUS),),
+    )
+    document = _document(region)
+
+    result = apply_cross_run_reconciliation(
+        document,
+        reconciliation,
+        (ReconciliationApplyDecision(
+            ApplyAction.ACCEPT_MATCH,
+            "hyp-1",
+            "persistent-1",
+            authorize_resolution=True,
+            reason="human review selected this target",
+        ),),
+        expected_document_fingerprint=document_fingerprint(document),
+    )
+    assert result.document.regions[0].region_id == "persistent-1"
+
+
+def test_apply_result_round_trip():
+    region = MedicalRegionData(
+        region_id="persistent-1",
+        bbox=(1, 1, 5, 5),
+        is_manually_edited=False,
+    )
+    hypothesis = RegionHypothesis("hyp-1", RegionType.CLINICAL_SECTION, (1, 1, 5, 5))
+    reconciliation = CrossRunReconciliationResult(
+        _analysis(hypothesis),
+        CrossRunMatchingConfig(),
+        (_candidate("hyp-1", "persistent-1", CrossRunMatchState.MATCHED),),
+    )
+    document = _document(region)
+    result = apply_cross_run_reconciliation(
+        document,
+        reconciliation,
+        (ReconciliationApplyDecision(
+            ApplyAction.ACCEPT_MATCH, "hyp-1", "persistent-1"
+        ),),
+        expected_document_fingerprint=document_fingerprint(document),
+    )
+    from ocr_core.cross_run_apply import ReconciliationApplyResult
+    restored = ReconciliationApplyResult.from_dict(result.to_dict())
+    assert restored.to_dict() == result.to_dict()
