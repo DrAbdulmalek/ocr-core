@@ -17,6 +17,9 @@
 - [ ] التكامل الكامل مع omni-medical-suite (استهلاك ocr-core بدل المكررات)
 - [x] خط الأنابيب الموحد ست المراحل + إعادة التعرف الانتقائي (clean-room — docs/research/abbyy_features.md)
 - [ ] Medical Region Editor UI (PR in progress) — optional PySide6 extra: `pip install -e ".[ui]"`
+- [x] نظام الأوامر الموحد (Command Pattern — 34 أمرًا في 8 فئات + CLI) — docs/commands.md
+- [x] كشف كلمات الخط اليدوي: word_detector (ONNX/projection/heuristic) + line_grouper (RTL) — extra: `pip install .[word-detect]` — docs/word_detection.md
+- [x] محرك jina-ocr-v1 (VLM للمستندات الكاملة) — extra: `pip install .[jina]` — ⚠️ الأوزان CC BY-NC 4.0 — docs/jina_ocr_v1.md
 
 
 ## الوحدات
@@ -33,6 +36,10 @@
 | `ocr_core.postprocess.arabic_rtl` | نقطة ربط RTL/العربية لخط الأنابيب (تفويض حرفي لـ rtl_utils) |
 | `ocr_core.rtl_utils` | معالجة العربية RTL (خرائط مبنية وقت الاستيراد) |
 | `ocr_core.telemetry` | سجل قرارات مهيكل (بديل decision_log) |
+| `ocr_core.commands` | نظام الأوامر الموحد: Command/Registry/Executor/Pipeline/ExecutionContext — 34 أمرًا (io, preprocess, ocr, postprocess, export, benchmark, detect, vlm) + محوّل CLI (`ocr-core list/describe/run/pipeline`) |
+| `ocr_core.preprocess.word_detector` | كشف كلمات الخط اليدوي: OnnxWordDetector (xournalpp-htr) / ProjectionDetector / HeuristicDetector + مصنع `create_detector` |
+| `ocr_core.preprocess.line_grouper` | تجميع الكلمات في سطور بترتيب القراءة (RTL/LTR) |
+| `ocr_core.engines.jina_vlm` | محرك jina-ocr-v1 (VLM end-to-end → Markdown/LaTeX/HTML — بلا bounding boxes). تحميل كسول؛ الأوزان CC BY-NC 4.0 |
 
 **سياسة الثقة:** الثقة `0.0` = مجهولة — لا تُختلق أبدًا (`engines/base.py`). المحركات تبلّغ الأخطاء عبر `OCRResult.error` ولا ترفع استثناءات.
 

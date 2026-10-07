@@ -1,0 +1,21 @@
+{
+  "name": "arabic_pdf_to_markdown",
+  "steps": [
+    {
+      "command": "vlm.pdf_to_markdown",
+      "params": {
+        "pdf_path": "/tmp/document.pdf",
+        "output_path": "/tmp/document.md",
+        "dpi": 200,
+        "strict": true
+      }
+    },
+    {
+      "command": "io.save_text",
+      "params": {
+        "context_key": "vlm_full_markdown",
+        "output_path": "/tmp/document_verified.md"
+      }
+    }
+  ]
+}
