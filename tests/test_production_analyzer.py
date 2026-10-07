@@ -99,3 +99,17 @@ def test_failed_observation_rejects_missing_failure_metadata():
         assert False
     except ValueError:
         pass
+
+
+def test_baseline_analyzer_output_fits_production_boundary():
+    from ocr_core.layout_baseline import ProjectionAnalyzerConfig, ProjectionLayoutAnalyzer
+
+    pixels = [[255, 10, 10, 255], [255, 255, 255, 255]]
+    result = ProjectionLayoutAnalyzer(
+        ProjectionAnalyzerConfig(min_ink_pixels=2)
+    ).analyze(pixels, _result().provenance)
+    observation = make_observation(result)
+
+    assert observation.status == "complete"
+    assert observation.provenance.analyzer == "baseline"
+    assert observation.result.hypotheses[0].bbox == (1.0, 0.0, 2.0, 1.0)
