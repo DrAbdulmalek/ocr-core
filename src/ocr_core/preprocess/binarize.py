@@ -11,11 +11,20 @@ definitions (no proprietary code):
   images for O(w*h) cost independent of the window size.
   Reference: J. Sauvola, M. Pietikäinen, "Adaptive document image
   binarization", Pattern Recognition 33(2), 2000.
-- Auto router: picks global vs adaptive by measuring illumination
-  uniformity (low-frequency luminance spread). Clean flatbed scans are
-  routed to Otsu; camera photos with shadows/gradients are routed to
-  Sauvola. This encodes the practical rule documented in
-  docs/09 §2.2: global Otsu collapses on non-uniform lighting.
+- Auto router: picks global vs adaptive by two independent page
+  measurements.
+    1. illumination uniformity (low-frequency luminance spread) —
+       camera photos with shadows/gradients → Sauvola. Encodes the
+       practical rule in docs/09 §2.2: global Otsu collapses on
+       non-uniform lighting.
+    2. ink contrast (Otsu class-mean separation) — faded/grey ink on
+       light paper → Sauvola. Encodes the gap measured on the golden
+       sample (docs/GOLDEN-SAMPLE.md §6.3): auto routed low-contrast
+       pages to Otsu at a 6× CER penalty because uniformity only sees
+       lighting, not ink.
+
+Clean high-contrast flatbed scans still go to Otsu, which is cleaner
+on paper texture and never bleeds background into strokes.
 
 Output convention everywhere: text = black (0), background = white (255),
 i.e. ready for engines that expect black-on-white input.
@@ -41,6 +50,7 @@ __all__ = [
     "binarize_otsu",
     "binarize_sauvola",
     "illumination_uniformity",
+    "ink_contrast",
     "binarize_auto",
 ]
 
@@ -213,7 +223,7 @@ def binarize_sauvola(
     return binary
 
 
-# ─── Auto router: global vs adaptive by illumination uniformity ─────────────
+# ─── Page measurements: illumination + ink contrast ─────────────────────────
 
 
 def illumination_uniformity(gray: np.ndarray, blocks: int = 8) -> float:
@@ -251,29 +261,63 @@ def illumination_uniformity(gray: np.ndarray, blocks: int = 8) -> float:
     return float(stats_arr.std() / overall)
 
 
+def ink_contrast(gray: np.ndarray) -> float:
+    """Measure foreground/background luminance separation.
+
+    Applies Otsu's split and returns the normalized distance between the
+    two class means:
+
+        (μ_paper − μ_ink) / 255
+
+    Dark ink on white paper scores ~0.7–0.9. Faded/grey ink on light
+    paper (the golden-sample `low_contrast` condition: ink=118, paper=238)
+    scores ~0.4–0.5. A uniform page scores 0.
+
+    This is independent of illumination_uniformity: a faded-ink scan can
+    be perfectly flat-lit and still need Sauvola, which is exactly the
+    6× CER gap measured in docs/GOLDEN-SAMPLE.md §6.3.
+    """
+    g = to_grayscale(gray)
+    t = otsu_threshold(g)
+    ink = g[g <= t]
+    paper = g[g > t]
+    if ink.size == 0 or paper.size == 0:
+        return 0.0
+    return float((paper.mean() - ink.mean()) / 255.0)
+
+
+# ─── Auto router: global vs adaptive by illumination + ink contrast ─────────
+
+
 def binarize_auto(
     image: np.ndarray,
     uniformity_limit: float = 0.12,
+    contrast_limit: float = 0.55,
     sauvola_window: int = 31,
     sauvola_k: float = 0.2,
 ) -> Dict[str, object]:
     """Route each page to the right binarization family automatically.
 
-    Decision rule (docs/09 §2.2 encoded):
+    Decision rule (docs/09 §2.2 + golden-sample §6.3 encoded):
       - illumination_uniformity > uniformity_limit → Sauvola (adaptive),
         because a global threshold collapses on shadows/gradients;
-      - otherwise → Otsu (global), which is cleaner on flat scans and
-        never bleeds background texture into strokes.
+      - else if ink_contrast < contrast_limit → Sauvola (adaptive),
+        because faded ink is a local-std problem Otsu's single cut
+        cannot recover (6× CER penalty measured on the golden sample);
+      - otherwise → Otsu (global), which is cleaner on high-contrast
+        flat scans and never bleeds background texture into strokes.
 
     Returns a dict rather than a bare array so callers (and tests) can
     log *why* a page was routed the way it was:
 
         {"image": uint8 binary, "method": "otsu"|"sauvola",
-         "illumination_ratio": float, "threshold": int|None}
+         "illumination_ratio": float, "ink_contrast": float,
+         "threshold": int|None}
     """
     g = to_grayscale(image)
     ratio = illumination_uniformity(g)
-    if ratio > uniformity_limit:
+    contrast = ink_contrast(g)
+    if ratio > uniformity_limit or contrast < contrast_limit:
         binary, thr = binarize_sauvola(
             g, window=sauvola_window, k=sauvola_k, return_threshold=True
         )
@@ -281,6 +325,7 @@ def binarize_auto(
             "image": binary,
             "method": "sauvola",
             "illumination_ratio": ratio,
+            "ink_contrast": contrast,
             "threshold": None,  # per-pixel map, not a single value
         }
     binary, thr = binarize_otsu(g, return_threshold=True)
@@ -288,5 +333,6 @@ def binarize_auto(
         "image": binary,
         "method": "otsu",
         "illumination_ratio": ratio,
+        "ink_contrast": contrast,
         "threshold": int(thr),
     }

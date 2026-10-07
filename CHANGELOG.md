@@ -7,6 +7,16 @@
 > marathon-ocr-core[tesseract] @ git+https://github.com/DrAbdulmalek/ocr-core.git@v0.5.0
 > ```
 
+## غير مُصدر (فرع feat/auto-ink-contrast)
+
+### أُضيف
+- **`ink_contrast` + توجيه التباين المنخفض في `binarize_auto`**: المقياس
+  الجديد يقيس انفصال متوسطَي فئتَي Otsu (حبر/ورق) مستقلاً عن تذبذب
+  الإضاءة. الموجّه يحوّل إلى Sauvola إن كان `illumination_uniformity`
+  مرتفعاً **أو** `ink_contrast` دون 0.55 — يُغلق الفجوة المقاسة في العينة
+  الذهبية (CER 6× على صفحات الحبر الباهت، docs/GOLDEN-SAMPLE.md §6.3)
+  دون المساس بتوجيه المسح النظيف إلى Otsu والظل إلى Sauvola.
+
 ## غير مُصدر (فرع feat/golden-sample-cer)
 
 ### أُضيف
