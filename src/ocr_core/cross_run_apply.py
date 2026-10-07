@@ -12,13 +12,13 @@ import hashlib
 import json
 from enum import Enum
 from typing import Any, Mapping
-from uuid import uuid4
 
 from .cross_run_matching import (
     CrossRunMatchCandidate,
     CrossRunMatchState,
     CrossRunReconciliationResult,
 )
+from .layout_analysis import LayoutAnalysisResult
 from .ui.models import LayoutDocument, MedicalRegionData
 
 
@@ -37,15 +37,19 @@ class ReconciliationApplyDecision:
     update_bbox: bool = False
     update_region_type: bool = False
     authorize_manual_override: bool = False
+    authorize_resolution: bool = False
     reason: str = ""
 
     def __post_init__(self) -> None:
         if not self.hypothesis_id or not self.persistent_region_id:
             raise ValueError("hypothesis_id and persistent_region_id are required")
         if self.action is ApplyAction.CREATE_NEW and (
-            self.update_bbox or self.update_region_type or self.authorize_manual_override
+            self.update_bbox
+            or self.update_region_type
+            or self.authorize_manual_override
+            or self.authorize_resolution
         ):
-            raise ValueError("CREATE_NEW cannot use update/override flags")
+            raise ValueError("CREATE_NEW cannot use update/override/resolution flags")
 
 
 @dataclass(frozen=True)
@@ -113,6 +117,24 @@ class ReconciliationApplyResult:
             "applied": [item.to_dict() for item in self.applied],
         }
 
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ReconciliationApplyResult":
+        return cls(
+            document=LayoutDocument.from_dict(payload["document"]),
+            source_id=str(payload["source_id"]),
+            analysis_run_id=(
+                str(payload["analysis_run_id"])
+                if payload.get("analysis_run_id") is not None
+                else None
+            ),
+            matching_policy_id=str(payload["matching_policy_id"]),
+            expected_document_fingerprint=str(payload["expected_document_fingerprint"]),
+            applied=tuple(
+                AppliedReconciliationAction.from_dict(item)
+                for item in payload.get("applied", [])
+            ),
+        )
+
 
 def document_fingerprint(document: LayoutDocument) -> str:
     """Return a deterministic fingerprint of the current document state."""
@@ -155,9 +177,6 @@ def apply_cross_run_reconciliation(
     if expected_document_fingerprint != actual_fingerprint:
         raise ValueError("document state is stale; apply requires the expected fingerprint")
 
-    if reconciliation.analysis.provenance.source_id != reconciliation.analysis.provenance.source_id.strip():
-        raise ValueError("analysis source_id is invalid")
-
     existing = {region.region_id: region for region in document.regions}
     if len(existing) != len(document.regions):
         raise ValueError("document contains duplicate region_id values")
@@ -168,6 +187,7 @@ def apply_cross_run_reconciliation(
 
     candidates = _candidate_index(reconciliation)
     seen_decisions: set[tuple[str, str]] = set()
+
     for decision in decisions:
         key = (decision.hypothesis_id, decision.persistent_region_id)
         if key in seen_decisions:
@@ -178,31 +198,38 @@ def apply_cross_run_reconciliation(
         if hypothesis is None:
             raise ValueError("apply decision references an unknown hypothesis")
 
-        candidate = candidates.get(key)
-        if candidate is None:
-            raise ValueError("apply decision references a candidate not present in reconciliation")
-
-        if decision.action is ApplyAction.ACCEPT_MATCH:
-            if candidate.state not in {
-                CrossRunMatchState.MATCHED,
-                CrossRunMatchState.CONFLICT,
-                CrossRunMatchState.AMBIGUOUS,
-            }:
-                raise ValueError("ACCEPT_MATCH requires a resolvable candidate")
-            if candidate.state is not CrossRunMatchState.MATCHED and not decision.authorize_manual_override:
-                raise ValueError("non-MATCHED candidate requires explicit resolution authorization")
-            target = existing.get(decision.persistent_region_id)
-            if target is None:
-                raise ValueError("target persistent region does not exist")
-            if target.is_manually_edited and not decision.authorize_manual_override:
-                raise ValueError("manual region requires explicit protected-region authorization")
-        elif decision.action is ApplyAction.CREATE_NEW:
+        if decision.action is ApplyAction.CREATE_NEW:
             if decision.hypothesis_id not in reconciliation.unmatched_new:
                 raise ValueError("CREATE_NEW requires an UNMATCHED_NEW hypothesis")
             if decision.persistent_region_id in existing:
                 raise ValueError("CREATE_NEW persistent_region_id already exists")
-        else:
-            raise ValueError("unsupported apply action")
+            if key in candidates:
+                raise ValueError("CREATE_NEW cannot target an existing reconciliation candidate")
+            continue
+
+        candidate = candidates.get(key)
+        if candidate is None:
+            raise ValueError("apply decision references a candidate not present in reconciliation")
+
+        if candidate.state not in {
+            CrossRunMatchState.MATCHED,
+            CrossRunMatchState.CONFLICT,
+            CrossRunMatchState.AMBIGUOUS,
+        }:
+            raise ValueError("ACCEPT_MATCH requires a resolvable candidate")
+
+        if candidate.state is not CrossRunMatchState.MATCHED and not decision.authorize_resolution:
+            raise ValueError("non-MATCHED candidate requires explicit resolution authorization")
+
+        target = existing.get(decision.persistent_region_id)
+        if target is None:
+            raise ValueError("target persistent region does not exist")
+
+        if target.is_manually_edited and not decision.authorize_manual_override:
+            raise ValueError("manual region requires explicit protected-region authorization")
+
+        if (candidate.state is CrossRunMatchState.AMBIGUOUS or candidate.state is CrossRunMatchState.CONFLICT) and not decision.reason.strip():
+            raise ValueError("resolved candidate requires an explicit reason")
 
     new_regions = [
         MedicalRegionData.from_dict(region.to_dict()) for region in document.regions
@@ -219,7 +246,7 @@ def apply_cross_run_reconciliation(
                 region_type=hypothesis.region_type,
                 bbox=hypothesis.bbox,
                 source=hypothesis.source,
-                is_manually_edited=decision.authorize_manual_override,
+                is_manually_edited=False,
             )
             new_regions.append(new_region)
             by_id[new_region.region_id] = new_region
@@ -242,10 +269,9 @@ def apply_cross_run_reconciliation(
         if decision.update_region_type:
             current.region_type = hypothesis.region_type
             changed.append("region_type")
-        if decision.authorize_manual_override:
+        if decision.authorize_manual_override and not current.is_manually_edited:
             current.is_manually_edited = True
-            if "is_manually_edited" not in changed:
-                changed.append("is_manually_edited")
+            changed.append("is_manually_edited")
 
         applied.append(
             AppliedReconciliationAction(
