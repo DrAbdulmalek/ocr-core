@@ -113,3 +113,61 @@ def test_baseline_analyzer_output_fits_production_boundary():
     assert observation.status == "complete"
     assert observation.provenance.analyzer == "baseline"
     assert observation.result.hypotheses[0].bbox == (1.0, 0.0, 2.0, 1.0)
+
+
+def test_repeated_observation_serialization_and_hypothesis_ids_are_deterministic():
+    from ocr_core.layout_baseline import ProjectionLayoutAnalyzer
+
+    pixels = [[255, 10, 10, 255], [255, 255, 255, 255]]
+    analyzer = ProjectionLayoutAnalyzer()
+    first = make_observation(analyzer.analyze(pixels, _result().provenance))
+    second = make_observation(analyzer.analyze(pixels, _result().provenance))
+
+    assert first == second
+    assert first.to_dict() == second.to_dict()
+    ids = [hypothesis.region_id for hypothesis in first.result.hypotheses]
+    assert len(ids) == len(set(ids))
+    assert all(not region_id.startswith("persistent:") for region_id in ids)
+
+
+def test_analysis_configuration_and_run_identity_are_preserved_in_observation():
+    observation = make_observation(_result())
+    payload = observation.to_dict()
+
+    assert payload["result"]["provenance"]["configuration_id"] == "cfg-a"
+    assert payload["result"]["provenance"]["analysis_run_id"] == "run-1"
+    assert observation.provenance.configuration_id == "cfg-a"
+    assert observation.provenance.analysis_run_id == "run-1"
+
+
+def test_analyzer_pipeline_does_not_mutate_manual_or_canonical_document():
+    from copy import deepcopy
+    from ocr_core.layout_baseline import ProjectionLayoutAnalyzer
+    from ocr_core.layout_analysis import reconcile
+    from ocr_core.ui.models import LayoutDocument, MedicalRegionData
+
+    document = LayoutDocument(
+        "doc-1",
+        (4, 2),
+        regions=[
+            MedicalRegionData(
+                region_id="persistent-1",
+                region_type=RegionType.FOOTER_SIGNATURE,
+                bbox=(0, 1, 4, 1),
+                source="user",
+                is_manually_edited=True,
+            )
+        ],
+    )
+    before = deepcopy(document.to_dict())
+
+    result = ProjectionLayoutAnalyzer().analyze(
+        [[255, 10, 10, 255], [255, 255, 255, 255]],
+        _result().provenance,
+    )
+    observation = make_observation(result)
+    reconciliation = reconcile(document, observation.result)
+
+    assert reconciliation.items
+    assert document.to_dict() == before
+    assert [region.region_id for region in document.regions] == ["persistent-1"]
