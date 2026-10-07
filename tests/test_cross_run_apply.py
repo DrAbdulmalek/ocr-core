@@ -9,6 +9,7 @@ from ocr_core.cross_run_apply import (
     ReconciliationApplyDecision,
     apply_cross_run_reconciliation,
     document_fingerprint,
+    ReconciliationApplyResult,
 )
 from ocr_core.cross_run_matching import (
     CrossRunMatchCandidate,
@@ -320,3 +321,76 @@ def test_apply_result_round_trip():
     from ocr_core.cross_run_apply import ReconciliationApplyResult
     restored = ReconciliationApplyResult.from_dict(result.to_dict())
     assert restored.to_dict() == result.to_dict()
+
+
+def test_apply_decision_round_trip_is_deterministic():
+    decision = ReconciliationApplyDecision(
+        ApplyAction.ACCEPT_MATCH,
+        "hyp-1",
+        "persistent-1",
+        update_bbox=True,
+        update_region_type=True,
+        authorize_manual_override=True,
+        authorize_resolution=True,
+        reason="human-approved resolution",
+    )
+    payload = decision.to_dict()
+    assert payload == decision.to_dict()
+    assert ReconciliationApplyDecision.from_dict(payload) == decision
+
+
+def test_apply_result_audit_preserves_explicit_decision():
+    region = MedicalRegionData(
+        region_id="persistent-1",
+        bbox=(1, 1, 5, 5),
+        is_manually_edited=False,
+    )
+    hypothesis = RegionHypothesis("hyp-1", RegionType.CLINICAL_SECTION, (1, 1, 5, 5))
+    reconciliation = CrossRunReconciliationResult(
+        _analysis(hypothesis),
+        CrossRunMatchingConfig(),
+        (_candidate("hyp-1", "persistent-1", CrossRunMatchState.MATCHED),),
+    )
+    document = _document(region)
+    decision = ReconciliationApplyDecision(
+        ApplyAction.ACCEPT_MATCH,
+        "hyp-1",
+        "persistent-1",
+        update_bbox=True,
+        reason="approved geometry refresh",
+    )
+    result = apply_cross_run_reconciliation(
+        document,
+        reconciliation,
+        (decision,),
+        expected_document_fingerprint=document_fingerprint(document),
+    )
+    assert result.applied[0].decision == decision
+    restored = ReconciliationApplyResult.from_dict(result.to_dict())
+    assert restored.applied[0].decision == decision
+
+
+def test_legacy_apply_result_payload_remains_readable():
+    region = MedicalRegionData(
+        region_id="persistent-1",
+        bbox=(1, 1, 5, 5),
+        is_manually_edited=False,
+    )
+    hypothesis = RegionHypothesis("hyp-1", RegionType.CLINICAL_SECTION, (1, 1, 5, 5))
+    reconciliation = CrossRunReconciliationResult(
+        _analysis(hypothesis),
+        CrossRunMatchingConfig(),
+        (_candidate("hyp-1", "persistent-1", CrossRunMatchState.MATCHED),),
+    )
+    document = _document(region)
+    result = apply_cross_run_reconciliation(
+        document,
+        reconciliation,
+        (ReconciliationApplyDecision(ApplyAction.ACCEPT_MATCH, "hyp-1", "persistent-1"),),
+        expected_document_fingerprint=document_fingerprint(document),
+    )
+    legacy_payload = result.to_dict()
+    for action in legacy_payload["applied"]:
+        action.pop("decision", None)
+    restored = ReconciliationApplyResult.from_dict(legacy_payload)
+    assert restored.applied[0].decision is None

@@ -50,6 +50,31 @@ class ReconciliationApplyDecision:
         ):
             raise ValueError("CREATE_NEW cannot use update/override/resolution flags")
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "action": self.action.value,
+            "hypothesis_id": self.hypothesis_id,
+            "persistent_region_id": self.persistent_region_id,
+            "update_bbox": self.update_bbox,
+            "update_region_type": self.update_region_type,
+            "authorize_manual_override": self.authorize_manual_override,
+            "authorize_resolution": self.authorize_resolution,
+            "reason": self.reason,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ReconciliationApplyDecision":
+        return cls(
+            action=ApplyAction(str(payload["action"])),
+            hypothesis_id=str(payload["hypothesis_id"]),
+            persistent_region_id=str(payload["persistent_region_id"]),
+            update_bbox=bool(payload.get("update_bbox", False)),
+            update_region_type=bool(payload.get("update_region_type", False)),
+            authorize_manual_override=bool(payload.get("authorize_manual_override", False)),
+            authorize_resolution=bool(payload.get("authorize_resolution", False)),
+            reason=str(payload.get("reason", "")),
+        )
+
 
 @dataclass(frozen=True)
 class AppliedReconciliationAction:
@@ -58,6 +83,7 @@ class AppliedReconciliationAction:
     persistent_region_id: str
     changed_fields: tuple[str, ...] = field(default_factory=tuple)
     reason: str = ""
+    decision: ReconciliationApplyDecision | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -66,6 +92,7 @@ class AppliedReconciliationAction:
             "persistent_region_id": self.persistent_region_id,
             "changed_fields": list(self.changed_fields),
             "reason": self.reason,
+            "decision": self.decision.to_dict() if self.decision is not None else None,
         }
 
     @classmethod
@@ -76,6 +103,11 @@ class AppliedReconciliationAction:
             persistent_region_id=str(payload["persistent_region_id"]),
             changed_fields=tuple(str(value) for value in payload.get("changed_fields", [])),
             reason=str(payload.get("reason", "")),
+            decision=(
+                ReconciliationApplyDecision.from_dict(payload["decision"])
+                if payload.get("decision") is not None
+                else None
+            ),
         )
 
 
@@ -259,6 +291,7 @@ def apply_cross_run_reconciliation(
                     persistent_region_id=decision.persistent_region_id,
                     changed_fields=("region_created",),
                     reason=decision.reason,
+                    decision=decision,
                 )
             )
             continue
@@ -282,6 +315,7 @@ def apply_cross_run_reconciliation(
                 persistent_region_id=decision.persistent_region_id,
                 changed_fields=tuple(changed),
                 reason=decision.reason,
+                decision=decision,
             )
         )
 
