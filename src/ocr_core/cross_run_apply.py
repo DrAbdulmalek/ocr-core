@@ -18,7 +18,6 @@ from .cross_run_matching import (
     CrossRunMatchState,
     CrossRunReconciliationResult,
 )
-from .layout_analysis import LayoutAnalysisResult
 from .ui.models import LayoutDocument, MedicalRegionData
 
 
@@ -206,6 +205,9 @@ def apply_cross_run_reconciliation(
             if key in candidates:
                 raise ValueError("CREATE_NEW cannot target an existing reconciliation candidate")
             continue
+
+        if decision.hypothesis_id in reconciliation.unmatched_new:
+            raise ValueError("ACCEPT_MATCH cannot apply to an UNMATCHED_NEW hypothesis")
 
         candidate = candidates.get(key)
         if candidate is None:
