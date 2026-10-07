@@ -244,14 +244,16 @@ def match_cross_run(
             continue
 
         region = existing[item.persistent_region_id]
-        if region.is_manually_edited and not item.evidence.region_type_equal:
+        if region.is_manually_edited and (
+            not item.evidence.region_type_equal or item.evidence.geometry_iou < 1.0
+        ):
             candidates.append(
                 CrossRunMatchCandidate(
                     item.hypothesis_id,
                     item.persistent_region_id,
                     item.evidence,
                     CrossRunMatchState.CONFLICT,
-                    "manual region type has precedence",
+                    "manual region geometry/type has precedence",
                 )
             )
         else:
