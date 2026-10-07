@@ -79,3 +79,23 @@ def test_validation_does_not_mutate_any_document():
     before = observation.to_dict()
     validate_analyzer_result(observation)
     assert observation.to_dict() == before
+
+
+def test_failed_observation_requires_explicit_failure_metadata_and_round_trips():
+    observation = make_observation(
+        _result(),
+        status="failed",
+        failure_code="INPUT_INVALID",
+        failure_message="pixel evidence is not rectangular",
+    )
+    restored = observation.from_dict(observation.to_dict())
+    assert restored == observation
+    assert restored.failure_code == "INPUT_INVALID"
+
+
+def test_failed_observation_rejects_missing_failure_metadata():
+    try:
+        make_observation(_result(), status="failed")
+        assert False
+    except ValueError:
+        pass
