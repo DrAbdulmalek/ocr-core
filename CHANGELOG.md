@@ -7,6 +7,26 @@
 > marathon-ocr-core[tesseract] @ git+https://github.com/DrAbdulmalek/ocr-core.git@v0.5.0
 > ```
 
+## غير مُصدر (فرع feat/abbyy-cleanroom-pipeline)
+
+### أُضيف
+- **`ocr_core.pipeline` — خط الأنابيب الموحد ست المراحل** (تصميم نظيف Clean-Room من
+  التوثيق العام فقط — انظر `docs/research/abbyy_features.md` والقرار D-004):
+  Preprocess → Layout Analysis → Recognition → Page Synthesis → Document
+  Synthesis → Export، مع أوضاع تحليل التخطيط `simple/complex/tables/auto`،
+  خطاف `layout_provider` للمحللات المستقبلية، سياسة النص الخام الحرفي
+  (التصحيحات في مفاتيح منفصلة)، وثقة 0.0 = مجهولة بلا اختلاق.
+- **`ocr_core.regional` — إعادة التعرف الانتقائي**: `extract_region` /
+  `rerun_region` / `rerun_regions` بصيغتي bbox ‏(xywh / xyxy)، فشل الـ bbox
+  والمحرك يُبلَّغ عبر `OCRResult.error` بلا استثناءات.
+- **`ocr_core.postprocess.arabic_rtl` — `ArabicRTLPostProcessor`**: نقطة ربط
+  RTL لخط الأنابيب، تفويض حرفي لـ `rtl_utils` (بلا قواعد جديدة).
+- **`scripts/benchmark_ocr.sh`**: غلاف أمر واحد لمجموعة القياس الذهبية.
+- **`docs/research/abbyy_features.md`**: توثيق الاستخلاص النظيف + القرار D-004
+  (أفكار من التوثيق العام فقط — لا كود ولا نماذج ولا قواميس).
+- اختبارات: `tests/test_pipeline.py` (20) + `tests/test_regional.py` (15) +
+  `tests/test_postprocess_arabic_rtl.py` (5) = 39 اختبارًا جديدًا (المجموع 420).
+
 ## غير مُصدر (فرع feat/auto-ink-contrast)
 
 ### أُضيف

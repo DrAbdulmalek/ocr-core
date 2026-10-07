@@ -15,6 +15,7 @@
 - [x] Benchmarks: suite كاملة + ci_suite (بوابات CER/WER، A/B) (PR #6)
 - [x] التكامل مع marathon_ted_pipeline (PR #14 مدموج — shim + pin)
 - [ ] التكامل الكامل مع omni-medical-suite (استهلاك ocr-core بدل المكررات)
+- [x] خط الأنابيب الموحد ست المراحل + إعادة التعرف الانتقائي (clean-room — docs/research/abbyy_features.md)
 - [ ] Medical Region Editor UI (PR in progress) — optional PySide6 extra: `pip install -e ".[ui]"`
 
 
@@ -27,6 +28,9 @@
 | `ocr_core.preprocess` | crop/deskew/rotate/enhance/normalize/dedup/text_dedup/pipeline |
 | `ocr_core.postprocess` | corrections_ar (311 زوجًا) + normalization + field_extractor + deduplication + medical_terms.json |
 | `ocr_core.benchmarks` | suite القياس الكاملة + ci_suite (threshold_checker + ab_testing) |
+| `ocr_core.pipeline` | خط الأنابيب الموحد: Preprocess → Layout → Recognition → Page Synthesis → Document Synthesis → Export — أوضاع التخطيط simple/complex/tables/auto |
+| `ocr_core.regional` | إعادة التعرف الانتقائي على منطقة محددة (bbox بصيغتي xywh وxyxy) |
+| `ocr_core.postprocess.arabic_rtl` | نقطة ربط RTL/العربية لخط الأنابيب (تفويض حرفي لـ rtl_utils) |
 | `ocr_core.rtl_utils` | معالجة العربية RTL (خرائط مبنية وقت الاستيراد) |
 | `ocr_core.telemetry` | سجل قرارات مهيكل (بديل decision_log) |
 
