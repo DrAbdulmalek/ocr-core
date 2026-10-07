@@ -123,8 +123,10 @@ def make_observation(
     *,
     quality: tuple[AnalyzerQuality, ...] = (),
     status: str = "complete",
+    failure_code: str | None = None,
+    failure_message: str | None = None,
 ) -> AnalyzerObservation:
     """Validate and wrap an analysis result without mutation."""
-    observation = AnalyzerObservation(result=result, quality=quality, status=status)
+    observation = AnalyzerObservation(\n        result=result,\n        quality=quality,\n        status=status,\n        failure_code=failure_code,\n        failure_message=failure_message,\n    )
     validate_analyzer_result(observation)
     return observation
