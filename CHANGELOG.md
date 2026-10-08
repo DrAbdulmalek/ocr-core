@@ -6,38 +6,40 @@
 > ```
 > marathon-ocr-core[tesseract] @ git+https://github.com/DrAbdulmalek/ocr-core.git@v0.5.0
 > ```
+## v0.7.0 (غير مُصدر — جاهز للوسم READY_FOR_TAG، بانتظار تفويض المالك)
 
-## غير مُصدر (فرع feat/abbyy-cleanroom-pipeline)
-
-### أُضيف
-- **`ocr_core.pipeline` — خط الأنابيب الموحد ست المراحل** (تصميم نظيف Clean-Room من
-  التوثيق العام فقط — انظر `docs/research/abbyy_features.md` والقرار D-004):
-  Preprocess → Layout Analysis → Recognition → Page Synthesis → Document
-  Synthesis → Export، مع أوضاع تحليل التخطيط `simple/complex/tables/auto`،
-  خطاف `layout_provider` للمحللات المستقبلية، سياسة النص الخام الحرفي
-  (التصحيحات في مفاتيح منفصلة)، وثقة 0.0 = مجهولة بلا اختلاق.
-- **`ocr_core.regional` — إعادة التعرف الانتقائي**: `extract_region` /
-  `rerun_region` / `rerun_regions` بصيغتي bbox ‏(xywh / xyxy)، فشل الـ bbox
-  والمحرك يُبلَّغ عبر `OCRResult.error` بلا استثناءات.
-- **`ocr_core.postprocess.arabic_rtl` — `ArabicRTLPostProcessor`**: نقطة ربط
-  RTL لخط الأنابيب، تفويض حرفي لـ `rtl_utils` (بلا قواعد جديدة).
-- **`scripts/benchmark_ocr.sh`**: غلاف أمر واحد لمجموعة القياس الذهبية.
-- **`docs/research/abbyy_features.md`**: توثيق الاستخلاص النظيف + القرار D-004
-  (أفكار من التوثيق العام فقط — لا كود ولا نماذج ولا قواميس).
-- اختبارات: `tests/test_pipeline.py` (20) + `tests/test_regional.py` (15) +
-  `tests/test_postprocess_arabic_rtl.py` (5) = 39 اختبارًا جديدًا (المجموع 420).
-
-## غير مُصدر (فرع feat/auto-ink-contrast)
+> محتوى هذا القسم مستخرج حرفيًا من كوميتات `v0.6.0..main` (3 كوميتات، 36 ملفًا):
+> دمج PR ‏#53 (النظام الموحد) + دمج PR ‏#52 (خط الأنابيب). حزمة التحقق:
+> `docs/plans/ocr-core-v0.7.0-release-readiness.md` في `marathon-suite` (PR ‏#20).
 
 ### أُضيف
-- **`ink_contrast` + توجيه التباين المنخفض في `binarize_auto`**: المقياس
-  الجديد يقيس انفصال متوسطَي فئتَي Otsu (حبر/ورق) مستقلاً عن تذبذب
-  الإضاءة. الموجّه يحوّل إلى Sauvola إن كان `illumination_uniformity`
-  مرتفعاً **أو** `ink_contrast` دون 0.55 — يُغلق الفجوة المقاسة في العينة
-  الذهبية (CER 6× على صفحات الحبر الباهت، docs/GOLDEN-SAMPLE.md §6.3)
-  دون المساس بتوجيه المسح النظيف إلى Otsu والظل إلى Sauvola.
+- **نظام أوامر موحد (34 أمرًا)** بنمط photocraft/wordcraft —
+  `commands/core.py`: `Command/CommandRegistry/Executor/Pipeline/ExecutionContext`
+  و8 مجموعات مدمجة: io(7) preprocess(6) ocr(4) postprocess(5) export(4)
+  benchmark(2) detect(3) vlm(3)، مع محوّل CLI ‏`ocr-core <list|describe|run|pipeline>`
+  وتسجيل `[project.scripts]` — صفر كسر: `OCRProcessor`/المحركات/CSS القائمة لا تُمَس.
+- **كشف كلمات الخط اليدوي**: `preprocess/word_detector.py`
+  (`OnnxWordDetector` من xournalpp-htr + `ProjectionDetector` + `HeuristicDetector`)
+  و`preprocess/line_grouper.py` لتجميع RTL/LTR في سطور؛ أوامر
+  `detect.words` / `detect.lines` / `detect.words_with_text`؛ extra جديد `[word-detect]`.
+- **محرك jina-ocr-v1** (VLM طرف-لطرف → Markdown/HTML/LaTeX بلا bboxes):
+  `engines/jina_vlm.py` + أوامر `vlm.extract` / `vlm.extract_batch` / `vlm.pdf_to_markdown`؛
+  extras ‏`[jina] [vlm] [pdf] [docx]` مستثناة من `[all]` (تراخيص أوزان CC BY-NC 4.0)؛
+  `pipelines/arabic_pdf_to_markdown.json` + `scripts/test_vlm_quick.py`.
+- **خط أنابيب الموثق الموحد ست المراحل + إعادة التعرف الانتقائي** (دمج PR ‏#52
+  على محتوى v0.6.0 داخل main).
+
+### ملاحظات الجودة
+- 6 تصحيحات تدقيق على كود المحادثة الأصلي موثقة في رسالة الدمج
+  (إعادة ربط `builtins/ocr.py` بالعقد الفعلي، تحقق مبكر قبل تحميل 7GB،
+  استيراد numpy المفقود، تحقق مسار fitz، مواءمة extras، typo توثيقي).
+- اختبارات جديدة عند الدمج: 68؛ الحزمة الكاملة وقت الدمج: 485 passed / 11 skipped
+  (المصدر: رسالة كوميت الدمج `9b088218`).
+
 
 ## غير مُصدر (فرع feat/golden-sample-cer)
+
+> ملاحظة تسوية 2026-10-08: توثيق `docs/GOLDEN-SAMPLE.md` دخل وسم v0.6.0، بينما بيانات `benchmarks/golden/` لم تدخل بعد — يبقى القسم غير مُصدر جزئيًا.
 
 ### أُضيف
 - **العينة الذهبية الموحدة** (`benchmarks/golden/`) — تنفيذ البند الأول من
@@ -58,7 +60,39 @@
 - إضافة `golden` إلى `optional-dependencies` (arabic-reshaper +
   python-bidi) وتثبيتها في CI.
 
-## غير مُصدر (فرع feat/algos-docs09)
+## v0.6.0 (مُصدر — وسم 2026-10-07)
+
+> تسوية بالأدلة: المقاطع الثلاثة التالية كانت مدرجة تحت «غير مُصدر» لفروع
+> (abbyy-cleanroom-pipeline / auto-ink-contrast / algos-docs09)، والفروع حُذفت بعد
+> الدمج، ووجود ملفاتها الحاسمة عند الوسم `v0.6.0` أثبت دخولها:
+> `src/ocr_core/pipeline*`، `src/ocr_core/preprocess/binarize.py`،
+> `src/ocr_core/decoding/ctc.py`، `docs/GOLDEN-SAMPLE.md`.
+
+### أُضيف
+- **`ocr_core.pipeline` — خط الأنابيب الموحد ست المراحل** (تصميم نظيف Clean-Room من
+  التوثيق العام فقط — انظر `docs/research/abbyy_features.md` والقرار D-004):
+  Preprocess → Layout Analysis → Recognition → Page Synthesis → Document
+  Synthesis → Export، مع أوضاع تحليل التخطيط `simple/complex/tables/auto`،
+  خطاف `layout_provider` للمحللات المستقبلية، سياسة النص الخام الحرفي
+  (التصحيحات في مفاتيح منفصلة)، وثقة 0.0 = مجهولة بلا اختلاق.
+- **`ocr_core.regional` — إعادة التعرف الانتقائي**: `extract_region` /
+  `rerun_region` / `rerun_regions` بصيغتي bbox ‏(xywh / xyxy)، فشل الـ bbox
+  والمحرك يُبلَّغ عبر `OCRResult.error` بلا استثناءات.
+- **`ocr_core.postprocess.arabic_rtl` — `ArabicRTLPostProcessor`**: نقطة ربط
+  RTL لخط الأنابيب، تفويض حرفي لـ `rtl_utils` (بلا قواعد جديدة).
+- **`scripts/benchmark_ocr.sh`**: غلاف أمر واحد لمجموعة القياس الذهبية.
+- **`docs/research/abbyy_features.md`**: توثيق الاستخلاص النظيف + القرار D-004
+  (أفكار من التوثيق العام فقط — لا كود ولا نماذج ولا قواميس).
+- اختبارات: `tests/test_pipeline.py` (20) + `tests/test_regional.py` (15) +
+  `tests/test_postprocess_arabic_rtl.py` (5) = 39 اختبارًا جديدًا (المجموع 420).
+
+### أُضيف
+- **`ink_contrast` + توجيه التباين المنخفض في `binarize_auto`**: المقياس
+  الجديد يقيس انفصال متوسطَي فئتَي Otsu (حبر/ورق) مستقلاً عن تذبذب
+  الإضاءة. الموجّه يحوّل إلى Sauvola إن كان `illumination_uniformity`
+  مرتفعاً **أو** `ink_contrast` دون 0.55 — يُغلق الفجوة المقاسة في العينة
+  الذهبية (CER 6× على صفحات الحبر الباهت، docs/GOLDEN-SAMPLE.md §6.3)
+  دون المساس بتوجيه المسح النظيف إلى Otsu والظل إلى Sauvola.
 
 ### أُضيف
 - **حزمة ثنائية مرجعية** (`preprocess/binarize.py`) من التعريفات المنشورة حصرًا:
@@ -87,7 +121,7 @@
   عبر `apply_binarization`.
 - اختبارات: `tests/test_binarize.py` (12 حالة) و`tests/test_ctc.py` (14 حالة).
 
-## v0.5.0 (قادم — إصدار عقد الاستهلاك المركزي)
+## v0.5.0 (مُصدر — وسم 2026-10-05 — إصدار عقد الاستهلاك المركزي)
 
 هذا الإصدار هو المرجع الذي تعقد عليه المستودعات المستهلكة (intelli-file-manager وغيرها)
 بصيغة "v0.5.0+ مع الواجهة العامة" في مستندات harness.
