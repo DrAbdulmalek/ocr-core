@@ -614,28 +614,40 @@ class OCRProcessor:
         }
 
     def save_outputs(self, result: dict, out_dir: Path, stem: str) -> dict:
-        """كتابة المخرجات: الصحيح والخاطئ في ملفين منفصلين + بيانات تعريف."""
+        """Write separate correct, incorrect, uncertain, verbatim, and metadata outputs."""
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         out_cfg = self.settings.get("output", {})
 
         md_path = None
-        if result["correct"]:
+        if result.get("correct"):
             md_path = out_dir / f"{stem}{out_cfg.get('correct_suffix', '')}.md"
             md_path.write_text(result["correct"], encoding="utf-8")
         wrong_path = None
-        if result["wrong"]:
-            wrong_path = (
-                out_dir / f"{stem}{out_cfg.get('wrong_suffix', '.wrong')}.md"
-            )
+        if result.get("wrong"):
+            wrong_path = out_dir / f"{stem}{out_cfg.get('wrong_suffix', '.wrong')}.md"
             wrong_path.write_text(result["wrong"], encoding="utf-8")
+        uncertain_path = None
+        if result.get("uncertain"):
+            uncertain_path = out_dir / f"{stem}{out_cfg.get('uncertain_suffix', '.uncertain')}.md"
+            uncertain_path.write_text(result["uncertain"], encoding="utf-8")
+        verbatim_path = None
+        if "text_verbatim" in result:
+            verbatim_path = out_dir / f"{stem}{out_cfg.get('verbatim_suffix', '.verbatim')}.txt"
+            verbatim_path.write_text(result["text_verbatim"], encoding="utf-8")
 
         meta_path = out_dir / f"{stem}{out_cfg.get('metadata_suffix', '.meta.json')}"
         meta_path.write_text(
             json.dumps(result["metadata"], ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        return {"markdown": md_path, "wrong": wrong_path, "metadata": meta_path}
+        return {
+            "markdown": md_path,
+            "wrong": wrong_path,
+            "uncertain": uncertain_path,
+            "verbatim": verbatim_path,
+            "metadata": meta_path,
+        }
 
     # ============================================================
     #                      طبقة الدليل البصري (v2)
