@@ -446,15 +446,46 @@ class OCRProcessor:
         threshold = params.get("correct_ratio_threshold", 0.85)
         words = text.split()
         if not words:
-            return {"correct": "", "wrong": text, "ratio": 0.0}
+            return {
+                "correct": "", "wrong": "", "uncertain": text,
+                "ratio": 0.0, "classification": "uncertain",
+                "evidence_markers": [],
+            }
         # كلمة "سليمة" = حروف عربية/لاتينية/أرقام/ترقيم قياسي فقط
         ok_re = re.compile(r"^[\u0621-\u064aa-zA-Z0-9.,;:!?()\[\]\"'«»،؛؟-]+$")
         good = sum(1 for w in words if ok_re.match(w))
         ratio = good / len(words)
+        require_evidence = params.get("require_visual_evidence", self.version >= 2)
+        if require_evidence:
+            found = list(self.stats.markers_found)
+            correct_markers = [m for m in found if m in self._correct_set]
+            incorrect_markers = [m for m in found if m in self._incorrect_set]
+            if correct_markers and not incorrect_markers:
+                return {
+                    "correct": text, "wrong": "", "uncertain": "",
+                    "ratio": round(ratio, 4), "classification": "correct",
+                    "evidence_markers": correct_markers,
+                }
+            if incorrect_markers and not correct_markers:
+                return {
+                    "correct": "", "wrong": text, "uncertain": "",
+                    "ratio": round(ratio, 4), "classification": "incorrect",
+                    "evidence_markers": incorrect_markers,
+                }
+            return {
+                "correct": "", "wrong": "", "uncertain": text,
+                "ratio": round(ratio, 4), "classification": "uncertain",
+                "evidence_markers": found,
+            }
+        # Explicit v1 compatibility mode only; the ratio is not semantic evidence.
+        is_clean = ratio >= threshold
         return {
-            "correct": text if ratio >= threshold else "",
-            "wrong": "" if ratio >= threshold else text,
+            "correct": text if is_clean else "",
+            "wrong": "" if is_clean else text,
+            "uncertain": "",
             "ratio": round(ratio, 4),
+            "classification": "correct" if is_clean else "incorrect",
+            "evidence_markers": list(self.stats.markers_found),
         }
 
     def r17_detect_lists_and_headings(self, text: str) -> str:
