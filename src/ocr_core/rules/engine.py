@@ -185,39 +185,36 @@ class OCRProcessor:
         vm = self.config.get("visual_markers") or {}
         correct = list(vm.get("correct") or _DEFAULT_CORRECT)
         incorrect = list(vm.get("incorrect") or _DEFAULT_INCORRECT)
-        # ضمان أن ✗ ✘ X موجودة دائمًا (متطلب صريح من المبدأ 6)
-        for m in ("✗", "✘", "X"):
-            if m not in incorrect:
-                incorrect.append(m)
+        ambiguous = list(vm.get("ambiguous") or ["X", "x"])
+        # Ambiguous symbols must never be promoted to incorrect by default.
+        incorrect = [item for item in incorrect if item not in ambiguous]
+        for marker in ("✗", "✘"):
+            if marker not in incorrect:
+                incorrect.append(marker)
 
         uf = self.config.get("uncertainty_flags") or _DEFAULT_UNCERTAINTY
         for k, v in _DEFAULT_UNCERTAINTY.items():
             uf.setdefault(k, v)
-
         fv = self.config.get("final_verification") or {}
         checks = list(fv.get("checklist") or _DEFAULT_CHECKS)
-        verdicts = list(fv.get("verdicts")
-                        or ["PASS", "PARTIAL", "UNCERTAIN", "FAILED"])
-
+        verdicts = list(fv.get("verdicts") or ["PASS", "PARTIAL", "UNCERTAIN", "FAILED"])
         color = dict(self.config.get("color_semantics") or {})
         color.setdefault("require_legend", True)
         color.setdefault("legend_keywords", _DEFAULT_LEGEND_KEYWORDS)
         color.setdefault("on_missing_legend", "COLOR_SEMANTICS_UNCERTAIN")
-
         ctx = (vm.get("context_keywords") or {}) or dict(_DEFAULT_CONTEXT)
 
         self.visual_markers_cfg = {
             "correct": correct,
             "incorrect": incorrect,
+            "ambiguous": ambiguous,
             "caution": vm.get("caution", ""),
         }
+        self.ambiguous_markers_cfg = set(ambiguous)
         self.uncertainty_labels = uf
         self.classification_labels = self.config.get("classification_labels") or {}
         self.color_semantics = color
-        self.verification = {
-            "required_checks": checks,
-            "final_status_options": verdicts,
-        }
+        self.verification = {"required_checks": checks, "final_status_options": verdicts}
         self.training_data_rules = self.config.get("training_data_rules") or {}
         self.context_keywords = ctx
 
