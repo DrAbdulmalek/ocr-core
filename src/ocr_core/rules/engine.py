@@ -67,7 +67,7 @@ _DEFAULT_CORRECT = ["✓", "✔", "☑"]
 _DEFAULT_RULES_FILE = (
     Path(__file__).resolve().parent.parent / "config" / "marathon_ocr_rules.yaml"
 )
-_DEFAULT_INCORRECT = ["✗", "✘", "X", "x", "✖", "❌"]
+_DEFAULT_INCORRECT = ["✗", "✘", "✖", "❌"]
 _DEFAULT_UNCERTAINTY = {
     "visual_confidence_low": "VISUAL_CONFIDENCE_LOW",
     "visual_interpretation": "VISUAL_INTERPRETATION_UNCERTAIN",
@@ -226,10 +226,13 @@ class OCRProcessor:
             vm = self.visual_markers_cfg
             vm["correct"] = [m for m in r14 if m in ("✓", "✔", "☑", "✅")] or vm["correct"]
             vm["incorrect"] = (
-                [m for m in r14 if m in ("✖", "✗", "✘", "❌", "X", "x")]
+                [m for m in r14 if m in ("✖", "✗", "✘", "❌")]
                 or vm["incorrect"]
             )
-            for m in ("✗", "✘", "X"):
+            vm["incorrect"] = [m for m in vm["incorrect"] if m not in {"X", "x"}]
+            vm["ambiguous"] = ["X", "x"]
+            self.ambiguous_markers_cfg = {"X", "x"}
+            for m in ("✗", "✘"):
                 if m not in vm["incorrect"]:
                     vm["incorrect"].append(m)
 
