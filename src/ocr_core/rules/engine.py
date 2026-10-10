@@ -623,19 +623,21 @@ class OCRProcessor:
         text: str,
         markers: dict[str, Any],
     ) -> dict[str, Any]:
-        """
-        markers = {"detected": ["✓", "✗", ...]}
-        يُرجع: status, correct_markers, incorrect_markers, label, x_warning
-        المبدأ 6: X تتطلب فحص سياق — يُعلَم بـ x_warning لا يُكتم.
-        """
+        """Classify only unambiguous markers; X/x remain uncertain without context."""
         detected = markers.get("detected") or []
         found_correct = [m for m in detected if m in self._correct_set]
         found_incorrect = [m for m in detected if m in self._incorrect_set]
+        found_ambiguous = [
+            m for m in detected
+            if m in getattr(self, "ambiguous_markers_cfg", {"X", "x"})
+        ]
 
         status = "neutral"
         label: str | None = None
-
-        if found_correct and not found_incorrect:
+        if found_ambiguous:
+            status = "uncertain"
+            label = self.uncertainty_labels["visual_interpretation"]
+        elif found_correct and not found_incorrect:
             status = "correct"
         elif found_incorrect and not found_correct:
             status = "incorrect"
@@ -643,15 +645,15 @@ class OCRProcessor:
             status = "uncertain"
             label = self.uncertainty_labels["visual_interpretation"]
 
-        # تحذير X (المبدأ 6): قد تكون رمزًا لا علامة تصحيح
         x_warning = None
-        if "X" in found_incorrect:
+        if any(m in {"X", "x"} for m in detected):
             x_warning = "X_REQUIRES_CONTEXT_CHECK"
 
         return {
             "status": status,
             "correct_markers": found_correct,
             "incorrect_markers": found_incorrect,
+            "ambiguous_markers": found_ambiguous,
             "label": label,
             "x_warning": x_warning,
         }
