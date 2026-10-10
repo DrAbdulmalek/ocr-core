@@ -537,6 +537,7 @@ class OCRProcessor:
     ) -> dict:
         """تنفيذ القواعد الـ 18 بالترتيب وإرجاع النص النظيف + البيانات الوصفية."""
         self.stats = OCRStats()
+        text_verbatim = raw_text
         text = raw_text
 
         # R01-R03: تنظيف أساسي
@@ -584,6 +585,8 @@ class OCRProcessor:
 
         if footnotes:
             text = text + "\n\n---\n\n## الحواشي\n\n" + footnotes
+        if sep["classification"] == "uncertain":
+            sep["uncertain"] = text
 
         metadata = {
             "rules_file": self.rules_file,
@@ -593,15 +596,19 @@ class OCRProcessor:
             "footnotes_count": self.stats.footnotes,
             "page_numbers_removed": self.stats.pages_dropped,
             "word_ratio": sep["ratio"],
-            "classification": "correct" if sep["correct"] else "wrong",
+            "classification": sep["classification"],
             "had_diacritics": getattr(self.stats, "diacritics_seen", False),
             "had_arabic_digits": getattr(self.stats, "original_digits", False),
         }
 
         return {
             "markdown": text,
+            "text_verbatim": text_verbatim,
+            "text_normalized": text,
             "correct": sep["correct"],
             "wrong": sep["wrong"],
+            "uncertain": sep["uncertain"],
+            "classification": sep["classification"],
             "ratio": sep["ratio"],
             "metadata": metadata,
         }
