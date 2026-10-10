@@ -880,30 +880,52 @@ class OCRProcessor:
         incorrect: str,
         evidence: dict[str, Any],
     ) -> dict[str, Any]:
-        """
-        القاعدة 15: الترجمة الخاطئة لا تدخل كـ target أبدًا.
-        يدعم المفاتيح القديمة (marker/color) والجديدة
-        (visual_marker/color_status).
-        """
+        """Keep candidates separate; promote a label only with explicit, traceable evidence."""
         marker = evidence.get("visual_marker") or evidence.get("marker")
         color = evidence.get("color_status") or evidence.get("color")
         confidence = evidence.get("confidence", "low")
+        label = evidence.get("label")
+        source_reference = evidence.get("source_reference") or evidence.get("source_file")
+        legend_found = evidence.get("legend_found") is True
+        explicitly_confirmed = evidence.get("evidence_confirmed") is True
 
-        status = "verified" if confidence == "high" else "uncertain"
+        marker_is_correct = marker in set(self.visual_markers_cfg.get("correct", []))
+        marker_is_incorrect = marker in set(self.visual_markers_cfg.get("incorrect", []))
+        color_is_correct = color == "green" and legend_found
+        color_is_incorrect = color == "red" and legend_found
+        label_has_evidence = (
+            (label == "positive_example" and (marker_is_correct or color_is_correct))
+            or (label == "negative_example" and (marker_is_incorrect or color_is_incorrect))
+        )
+        verified = bool(
+            confidence == "high"
+            and explicitly_confirmed
+            and source_reference
+            and label_has_evidence
+        )
+        positive = correct if verified and label == "positive_example" else None
+        negative = incorrect if verified and label == "negative_example" else None
 
         return {
             "source": source,
-            "positive_example": correct or None,
-            "negative_example": incorrect or None,
+            "positive_example": positive,
+            "negative_example": negative,
+            "candidate_positive_example": correct or None,
+            "candidate_negative_example": incorrect or None,
             "evidence": {
                 "marker": marker or "none",
                 "color": color or "uncertain",
+                "legend_found": legend_found,
+                "label": label or "uncertain",
+                "source_reference": source_reference or None,
+                "evidence_confirmed": explicitly_confirmed,
                 "confidence": confidence,
             },
-            "status": status,
-            # حقول قديمة للتوافق
-            "correct_translation": correct or None,
-            "incorrect_translation": incorrect or None,
+            "status": "verified" if verified else "uncertain",
+            "training_eligible": bool(verified and positive),
+            # Legacy fields are gated too; unverified suggestions remain candidates above.
+            "correct_translation": positive,
+            "incorrect_translation": negative,
         }
 
     # ---------- التحقق النهائي (المبدأ 17) ----------
