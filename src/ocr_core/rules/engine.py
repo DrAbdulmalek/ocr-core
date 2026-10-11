@@ -460,25 +460,53 @@ class OCRProcessor:
         ratio = good / len(words)
         require_evidence = params.get("require_visual_evidence", self.version >= 2)
         if require_evidence:
-            found = list(self.stats.markers_found)
-            correct_markers = [m for m in found if m in self._correct_set]
-            incorrect_markers = [m for m in found if m in self._incorrect_set]
-            if correct_markers and not incorrect_markers:
+            # نطاق الدليل (إصلاح ملاحظة مراجعة PR #57): الدليل يُشتق من النص
+            # المُمرَّر نفسه سطرًا بسطر، لا من self.stats.markers_found
+            # المتراكمة عبر النصوص — علامة واحدة لا تُصادق على مستند كامل،
+            # وأدلة نص سابق لا تتسرب إلى نص لاحق.
+            correct_set = self._correct_set
+            incorrect_set = self._incorrect_set
+            evidence_in_text: list = []
+            correct_lines: list = []
+            wrong_lines: list = []
+            uncertain_lines: list = []
+            for ln in text.splitlines() or [text]:
+                line_correct = [m for m in correct_set if m in ln]
+                line_incorrect = [m for m in incorrect_set if m in ln]
+                evidence_in_text.extend(line_correct)
+                evidence_in_text.extend(line_incorrect)
+                if line_correct and line_incorrect:
+                    # دليلان متضاربان في السطر نفسه → السطر غير محسوم
+                    uncertain_lines.append(ln)
+                elif line_correct:
+                    correct_lines.append(ln)
+                elif line_incorrect:
+                    wrong_lines.append(ln)
+                else:
+                    uncertain_lines.append(ln)
+            evidence_in_text = sorted(set(evidence_in_text))
+            if not correct_lines and not wrong_lines:
+                # لا دليل مُقيِّد في النص → يبقى غير محسوم بالكامل (سلوك محافظ)
                 return {
-                    "correct": text, "wrong": "", "uncertain": "",
-                    "ratio": round(ratio, 4), "classification": "correct",
-                    "evidence_markers": correct_markers,
+                    "correct": "", "wrong": "", "uncertain": text,
+                    "ratio": round(ratio, 4), "classification": "uncertain",
+                    "evidence_markers": evidence_in_text,
                 }
-            if incorrect_markers and not correct_markers:
-                return {
-                    "correct": "", "wrong": text, "uncertain": "",
-                    "ratio": round(ratio, 4), "classification": "incorrect",
-                    "evidence_markers": incorrect_markers,
-                }
+            # تصنيف المستند الكامل محافظ: correct فقط إذا كان كل سطر مؤكدًا
+            # صحيحًا، وincorrect فقط إذا كان كل سطر مؤكدًا خاطئًا، وإلا uncertain.
+            if correct_lines and not wrong_lines and not uncertain_lines:
+                classification = "correct"
+            elif wrong_lines and not correct_lines and not uncertain_lines:
+                classification = "incorrect"
+            else:
+                classification = "uncertain"
             return {
-                "correct": "", "wrong": "", "uncertain": text,
-                "ratio": round(ratio, 4), "classification": "uncertain",
-                "evidence_markers": found,
+                "correct": "\n".join(correct_lines),
+                "wrong": "\n".join(wrong_lines),
+                "uncertain": "\n".join(uncertain_lines),
+                "ratio": round(ratio, 4),
+                "classification": classification,
+                "evidence_markers": evidence_in_text,
             }
         # Explicit v1 compatibility mode only; the ratio is not semantic evidence.
         is_clean = ratio >= threshold
@@ -588,7 +616,10 @@ class OCRProcessor:
 
         if footnotes:
             text = text + "\n\n---\n\n## الحواشي\n\n" + footnotes
-        if sep["classification"] == "uncertain":
+        # تجديد bucket غير المحسوم فقط عندما يكون فارغًا (بعد ربط النطاق
+        # في R16 قد يحتوي بالفعل الأسطر غير المؤكدة؛ تجربة النص كاملًا هنا
+        # ستكرر الأسطر المؤكدة بالدليل في bucket غير المحسوم).
+        if sep["classification"] == "uncertain" and not sep["uncertain"]:
             sep["uncertain"] = text
 
         metadata = {
