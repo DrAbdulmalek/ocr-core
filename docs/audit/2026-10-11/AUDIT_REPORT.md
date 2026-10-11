@@ -6,7 +6,7 @@ See `pr_states.json`, `ci_evidence.json`, `repo_inventory.json|csv`, `findings_r
 ## 1. Inventory
 
 `GET /user/repos?affiliation=owner,collaborator,organization_member` returned **55 repositories**
-(32 public, 23 private) for `DrAbdulmalek` (id 101952860). **14 are archived.**
+(32 public, 23 private) for `DrAbdulmalek` (id 101952860). **15 are archived** according to the bundled `repo_inventory.json` and `repo_inventory.csv`; the original count of 14 was a report-generation inconsistency.
 Machine-readable list: `repo_inventory.json` / `repo_inventory.csv`.
 
 ## 2. Verified PR states (live)
@@ -80,3 +80,15 @@ excludes `jina`/`surya` for weight-licence reasons (`pyproject.toml`).
 Merging, drafting/un-drafting any PR, closing PRs, deleting/archiving repos or branches, publishing any dataset,
 running Telegram ingestion/backfill, rotating the chat-exposed token, changing branch protection, or repairing
 the failing `Scheduled Tasks` / `Build Android APK` workflows (both touch production paths).
+
+
+## 9. Errata and evidence completeness — 2026-10-12
+
+The initial bundle had three provenance inconsistencies; this section supersedes the affected statements above:
+
+- **Archived count:** 15 of 55 repositories are archived, matching the machine-readable inventory. The earlier prose count of 14 was incorrect.
+- **PR #58 corrective commit:** the placeholder in the initial manifest is replaced with full SHA `15e1c4644a9b688cdeaa135d220e265f9a6ab61b`. The commit only corrects the test assertion; its diff contains no product-code change.
+- **CI register:** the compatibility PR's run `38179374931` was independently fetched for commit `c897389a5370809a5972726c9ee9eec663728732` and concluded `success`. The run is now recorded in `ci_evidence.json`. This does **not** establish CI success for PR #58's corrective head or PR #59's documentation head; their exact-head CI status remains unverified here.
+- **PR #58 dependency:** it is intentionally stacked on PR #57's head `e4e80e2370de8a8ebf5fc3f85a9dd1d16f49ebda`, not directly on `main`. Review/merge order must preserve this dependency or the branch must be rebased in a separately reviewed change.
+
+Do not interpret historical local test logs as proof of current remote CI. All PRs remain review-gated; no merge is authorized by this report.
