@@ -440,6 +440,24 @@ class OCRProcessor:
             return word
         return re.sub(r"\S+", _flag, text)
 
+
+    # نطاق الدليل داخل السطر (المبدأ 9): علامة واحدة لا تُثبت إلا المقطع
+    # الذي تلتصق به فعليًا. يُستخدم في R16.
+    _SEGMENT_SPLIT_RE = re.compile(r"[.!?\u061f\u061b\u2026]+")
+    _MARKER_ONLY_RE = re.compile(r"^[\s\W_]+$", re.UNICODE)
+
+    def _evidence_scope_is_line_unambiguous(self, line: str) -> bool:
+        """هل يمكن نَسب العلامة في هذا السطر إلى مقطع إجابة واحد؟
+
+        السطر «قابل للنَسب» فقط إذا احتوى على مقطع نصي جوهري واحد بالضبط
+        (يحمل حروفًا/أرقامًا). سطر رموز فقط لا يُنسب إلى أي إجابة، وسطر يضم
+        عدة إجابات معًا (مخرَج OCR بلا حدود أسطر) لا يحمل دليلًا موضعيًا لأي
+        منها بمفردها — كلاهما يبقى uncertain حمايةً لبيانات التدريب.
+        """
+        segments = [s.strip() for s in self._SEGMENT_SPLIT_RE.split(line) if s.strip()]
+        substantive = [s for s in segments if not self._MARKER_ONLY_RE.match(s)]
+        return len(substantive) == 1
+
     def r16_separate_correct_vs_wrong(self, text: str) -> dict:
         """R16: فصل المخرجات الصحيحة عن الخاطئة (حماية بيانات التدريب)."""
         if "R16" in self.rules and self.rules["R16"].get("enabled", False):
@@ -478,10 +496,17 @@ class OCRProcessor:
                 if line_correct and line_incorrect:
                     # دليلان متضاربان في السطر نفسه → السطر غير محسوم
                     uncertain_lines.append(ln)
-                elif line_correct:
-                    correct_lines.append(ln)
-                elif line_incorrect:
-                    wrong_lines.append(ln)
+                elif line_correct or line_incorrect:
+                    # نطاق الدليل (المبدأ 9): العلامة تُثبت المقطع الذي تلتصق به
+                    # فقط. سطر بلا مقطع نصي واحد، أو سطر يضم عدة مقاطع إجابات،
+                    # لا يسمح بنَسب الدليل → يبقى غير محسوم.
+                    if self._evidence_scope_is_line_unambiguous(ln):
+                        if line_correct:
+                            correct_lines.append(ln)
+                        else:
+                            wrong_lines.append(ln)
+                    else:
+                        uncertain_lines.append(ln)
                 else:
                     uncertain_lines.append(ln)
             evidence_in_text = sorted(set(evidence_in_text))
