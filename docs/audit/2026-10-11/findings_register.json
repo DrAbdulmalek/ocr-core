@@ -36,8 +36,8 @@
       "type": "ci_failure_on_default_branch",
       "repo": "marathon_ted_pipeline",
       "evidence_label": "PROVEN",
-      "detail": "'Scheduled Tasks' workflow failed on main at 2026-10-08/09/10/11 (runs 37762059884, 37916407378, 38041939315, 38129666592, 38137407655).",
-      "action_taken": "Reported only; not repaired (production ingestion path)."
+      "detail": "'Scheduled Tasks' workflow failed on main at 2026-10-08/09/10/11 (runs 37762059884, 37916407378, 38041939315, 38129666592, 38137407655). Live job-log inspection of run 38137407655 identifies the immediate failure as `appleboy/ssh-action@v1.0.3` → `Error: missing server host`; likely empty/mis-scoped secret input. This is owner-config blocked, not a code fix. Do not mask or retry production deployment.",
+      "action_taken": "Root cause isolated from job logs; no workflow/config/secrets changed. Owner must verify secret names and environment scope without exposing values."
     },
     {
       "id": "F-008",
@@ -45,8 +45,8 @@
       "type": "ci_failure_on_default_branch",
       "repo": "intelli-file-manager",
       "evidence_label": "PROVEN",
-      "detail": "'Build Android APK' failing on main (runs 37599741264, 37683366703, 37690369977).",
-      "action_taken": "Reported only."
+      "detail": "'Build Android APK' failing on main (runs 37599741264, 37683366703, 37690369977). Live job-log inspection of run 37690369977 identifies Kivy 2.2.1/Cython callback signature incompatibility (`except * nogil` vs `noexcept`) in gstplayer. Root workflow file's buildozer.spec calls Android/Kivy experimental and historical; support status needs owner decision.",
+      "action_taken": "Root cause isolated; no code/workflow changed because Android packaging is explicitly marked non-product/historical. Requires owner decision then isolated toolchain PR if still supported."
     },
     {
       "id": "F-009",
@@ -82,7 +82,7 @@
       "repo": "omni-medical-suite",
       "evidence_label": "PROVEN",
       "detail": "PR#166 adds the same modules twice: src/ocr/{pattern_store,slice_store,training_export}.py and hf-space/src/ocr/... (see manifest hashes).",
-      "action_taken": "Reported; canonicalization proposal only (no destructive change)."
+      "action_taken": "Canonicalization remains unimplemented; requires explicit file-layout choice and branch-level test proving both runtime/package contexts import the single canonical implementation. No deletions or layout change made."
     },
     {
       "id": "F-012",
@@ -91,7 +91,7 @@
       "repo": "omni-ocr-training-db",
       "evidence_label": "PARTIALLY_PROVEN",
       "detail": "Repository is a data store (patterns/, slices/, exports/, sync_state.json) with no schema/migration code: lifecycle stages such as approval, content-hash provenance and export ledger are not implemented in that repo and are only partially visible in PR#166 export code.",
-      "action_taken": "Documented; no dataset written or published."
+      "action_taken": "Implementation is not complete. Added explicit design/acceptance gates to TRAINING_DATA_LIFECYCLE.md; no export/publish code or data modified."
     },
     {
       "id": "F-013",
@@ -109,9 +109,9 @@
       "type": "evidence_scope_defect",
       "repo": "ocr-core",
       "evidence_label": "PROVEN",
-      "detail": "r16_separate_correct_vs_wrong attributed visual evidence at LINE granularity: one marker in a line containing several answers marked the whole blob 'correct'. Baseline on PR #57 head: 2 of 17 adversarial tests failed.",
-      "commit": "c8b1c0f on audit/evidence-scope-line-attribution (see PR)",
-      "action_taken": "Fixed on an isolated branch stacked on PR #57; draft PR opened. PR #57 untouched.",
+      "detail": "r16_separate_correct_vs_wrong attributed visual evidence at LINE granularity: one marker in a line containing several answers marked the whole blob 'correct'. Baseline on PR #57 head: 3 failed, 14 passed across the adversarial test file; two failures were product defects and one was a test-harness schema assertion defect, corrected in commit 15e1c4644a9b688cdeaa135d220e265f9a6ab61b.",
+      "commit": "15e1c4644a9b688cdeaa135d220e265f9a6ab61b (test-only correction; paired with product fix f7d2a8e5295d51d53b59f6bbbf71df1417f9e87d)",
+      "action_taken": "Product fix and test correction are on draft PR #58 stacked on PR #57. Local logs report focused 23 passed/full 515 passed 7 skipped; current exact-head remote CI remains unverified.",
       "rollback": "Revert the single commit on audit/evidence-scope-line-attribution."
     }
   ]
