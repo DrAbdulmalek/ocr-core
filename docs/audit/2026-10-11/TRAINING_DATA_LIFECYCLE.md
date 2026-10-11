@@ -28,3 +28,18 @@ contract is the minimum justified fix; not performed here (destructive to an ope
 Current content: 3 seed slices of Telegram **screenshot UI text** ("Chats", "Channels") —
 no clinical data, and the repository is private. The risk is structural (missing ledger), not present content.
 No dataset was written, exported, or published during this audit.
+
+
+## Remediation specification — not yet implemented
+
+The diagram above is the target, not a claim that every stage exists. Do not export or publish until all gates below exist and are covered by tests.
+
+1. **Content identity:** persist a versioned canonical serialization hash (SHA-256) over the annotation payload, including verbatim text, normalized text, region/box metadata, source reference, schema version and applicable correction metadata. Keep raw source hashes separate from derived-record hashes. A repeated `(source_id, source_revision, content_hash)` must be idempotent; a changed hash must create a new revision, not overwrite history.
+2. **Approval binding:** store approval actor, timestamp, consent/purpose, decision, policy version and the exact content hash approved. Any content mutation invalidates that approval and returns the record to pending review. Fail closed for absent or mismatched approvals.
+3. **Export ledger:** append-only records with export_id, dataset/destination identifier, selected record IDs and hashes, split assignment, exporter version, schema version, privacy-policy version, approval snapshot, creation time, result/status and remote revision/commit if available. Do not store credentials in the ledger.
+4. **Destination-specific authorization:** require explicit authorization for each destination and purpose (local file, private dataset, public Hugging Face dataset, etc.). Public publish must be a separate, human-confirmed operation; no automatic publish from approval or CI.
+5. **Reconciliation/rollback:** dry-run first; export to a versioned staging path; verify count/hash manifest; then promote only with authorization. Record revocations and tombstones rather than silently deleting history. Public dataset corrections require a destination-specific remediation plan.
+6. **Validation:** test changed content invalidates approval; same content re-ingestion is idempotent; rejected/pending records never export; tampered hashes fail closed; destination mismatch is denied; retry does not duplicate; rollback restores previous pointer; no secrets/PII in logs; split assignment remains deterministic and leakage-safe.
+
+### Canonical-module decision
+The three duplicated modules in `src/ocr/` and `hf-space/src/ocr/` are not deleted or moved in this audit. Before canonicalization, determine packaging/deployment constraints for the HF Space, choose one source of truth, and add an import/package test for both deployment targets. A sync script is acceptable only if it verifies byte-for-byte parity and fails CI on drift; it must not silently overwrite divergent code.
