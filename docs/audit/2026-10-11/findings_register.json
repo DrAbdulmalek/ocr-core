@@ -1,0 +1,118 @@
+{
+  "count": 12,
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "CRITICAL",
+      "type": "credential_exposure",
+      "repo": "(conversation, not a repository)",
+      "evidence_label": "PROVEN",
+      "detail": "A live GitHub classic PAT (prefix ghp_, 40 chars) was pasted into the chat transcript. Value never printed, never written to a git remote, never committed; held only in an ephemeral chmod-600 sandbox file for API/git calls.",
+      "owner_action": "Revoke immediately at https://github.com/settings/tokens and rotate any dependent automation. Verified I did not commit or push it.",
+      "rollback": "N/A (no write)"
+    },
+    {
+      "id": "F-002",
+      "severity": "HIGH",
+      "type": "cross_repo_contract_drift",
+      "repo": "marathon_ted_pipeline",
+      "evidence_label": "PROVEN",
+      "detail": "config/marathon_ocr_rules.yaml:243 sets R16.params.require_visual_evidence=false; requirements.txt:77 pins marathon-ocr-core @ ...ocr-core.git@v0.6.0. ocr-core PR#57 (unmerged) sets it true (src/ocr_core/config/marathon_ocr_rules.yaml:243, ocr_core/charter_v2.yaml:21). Charter text and runtime behaviour diverge.",
+      "action_taken": "Isolated draft PR with an offline contract tripwire; no boolean or pin change.",
+      "rollback": "Revert the single commit on the feature branch."
+    },
+    {
+      "id": "F-004",
+      "severity": "LOW",
+      "type": "reported_defect_contradicted",
+      "repo": "marathon_ted_pipeline / omni-medical-dictionaries / dictionaries-csv",
+      "evidence_label": "CONTRADICTED",
+      "detail": "The reported malformed filter 'branches: ain]' does not exist. The live files contain 'branches: [main]'; the fragment was code-search snippet truncation.",
+      "action_taken": "No workflow modified."
+    },
+    {
+      "id": "F-007",
+      "severity": "HIGH",
+      "type": "ci_failure_on_default_branch",
+      "repo": "marathon_ted_pipeline",
+      "evidence_label": "PROVEN",
+      "detail": "'Scheduled Tasks' workflow failed on main at 2026-10-08/09/10/11 (runs 37762059884, 37916407378, 38041939315, 38129666592, 38137407655).",
+      "action_taken": "Reported only; not repaired (production ingestion path)."
+    },
+    {
+      "id": "F-008",
+      "severity": "MEDIUM",
+      "type": "ci_failure_on_default_branch",
+      "repo": "intelli-file-manager",
+      "evidence_label": "PROVEN",
+      "detail": "'Build Android APK' failing on main (runs 37599741264, 37683366703, 37690369977).",
+      "action_taken": "Reported only."
+    },
+    {
+      "id": "F-009",
+      "severity": "INFO",
+      "type": "verified_green",
+      "repo": "ocr-core",
+      "evidence_label": "PROVEN",
+      "detail": "PR#57 head e4e80e2370de is green: tests run 38178234312, Secret Gate run 38178234318 (both success, 2026-10-11T21:53:52Z). PR left open and draft.",
+      "action_taken": "No merge (out of authorization)."
+    },
+    {
+      "id": "F-010",
+      "severity": "INFO",
+      "type": "verified_green",
+      "repo": "intelli-file-manager",
+      "evidence_label": "PROVEN",
+      "detail": "Reference run 38177440179 'Python CI' on feat/harness-engineering @ 37920a6ef8ac71aed7ad3ac21d5b65761435eb3e = success (reverified live).",
+      "action_taken": "No duplicate correction PR created."
+    },
+    {
+      "id": "F-006",
+      "severity": "MEDIUM",
+      "type": "review_load",
+      "repo": "omni-medical-suite",
+      "evidence_label": "PROVEN",
+      "detail": "45 open PRs; PR#166 is NOT a draft (draft=false) and is green across 11 workflows at head 8077f5f1a362.",
+      "action_taken": "Reported; no state change (drafting it would need owner authorization)."
+    },
+    {
+      "id": "F-011",
+      "severity": "MEDIUM",
+      "type": "duplication",
+      "repo": "omni-medical-suite",
+      "evidence_label": "PROVEN",
+      "detail": "PR#166 adds the same modules twice: src/ocr/{pattern_store,slice_store,training_export}.py and hf-space/src/ocr/... (see manifest hashes).",
+      "action_taken": "Reported; canonicalization proposal only (no destructive change)."
+    },
+    {
+      "id": "F-012",
+      "severity": "MEDIUM",
+      "type": "data_integrity",
+      "repo": "omni-ocr-training-db",
+      "evidence_label": "PARTIALLY_PROVEN",
+      "detail": "Repository is a data store (patterns/, slices/, exports/, sync_state.json) with no schema/migration code: lifecycle stages such as approval, content-hash provenance and export ledger are not implemented in that repo and are only partially visible in PR#166 export code.",
+      "action_taken": "Documented; no dataset written or published."
+    },
+    {
+      "id": "F-013",
+      "severity": "LOW",
+      "type": "local_harness",
+      "repo": "ocr-core (pre-existing on main)",
+      "evidence_label": "PROVEN",
+      "detail": "A stray root-level package shadow src/ocr_core/: ./ocr_core/__init__.py + charter_v2.yaml. Running pytest from the repo root raises ModuleNotFoundError: No module named 'ocr_core.rules' (local reproduction). GitHub Actions is unaffected (CI green at head e4e80e2), so this is a local-dev footgun, not a CI break.",
+      "action_taken": "Reported only. Not changed by either PR (would alter unrelated paths on main).",
+      "repro": "cd ocr-core && pip install -e . --no-deps && python3 -m pytest tests -q  -> 37 collection errors"
+    },
+    {
+      "id": "F-014",
+      "severity": "HIGH",
+      "type": "evidence_scope_defect",
+      "repo": "ocr-core",
+      "evidence_label": "PROVEN",
+      "detail": "r16_separate_correct_vs_wrong attributed visual evidence at LINE granularity: one marker in a line containing several answers marked the whole blob 'correct'. Baseline on PR #57 head: 2 of 17 adversarial tests failed.",
+      "commit": "c8b1c0f on audit/evidence-scope-line-attribution (see PR)",
+      "action_taken": "Fixed on an isolated branch stacked on PR #57; draft PR opened. PR #57 untouched.",
+      "rollback": "Revert the single commit on audit/evidence-scope-line-attribution."
+    }
+  ]
+}
