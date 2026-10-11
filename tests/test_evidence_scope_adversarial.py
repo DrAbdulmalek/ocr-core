@@ -181,6 +181,7 @@ def test_single_line_without_answer_markers_is_not_whole_document_correct(proc):
 
 # ---------- public API stability ----------
 def test_public_result_schema_stable(proc):
+    """Invariant 10: the serialized result keeps the documented keys."""
     result = proc.process_text("نص. \u2713")
     assert PUBLIC_KEYS.issubset(result.keys())
-    assert PUBLIC_KEYS.issubset(set(result["metadata"].keys()) | {"markdown"})
+    assert {"rules_file", "rules_applied", "markers", "classification"} <= set(result["metadata"].keys())
