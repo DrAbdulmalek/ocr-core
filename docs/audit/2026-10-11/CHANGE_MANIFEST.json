@@ -29,7 +29,7 @@
       ],
       "pr": "#58 (draft)",
       "rollback": "git revert the commits on the branch; main untouched",
-      "remote_ci_status": "UNVERIFIED for corrective head in this audit pass; do not infer green CI from local test logs"
+      "remote_ci_status": "SUCCESS — exact corrective head 15e1c4644a9b688cdeaa135d220e265f9a6ab61b: tests run 38179903738 and Secret Gate run 38179903742 both success"
     },
     {
       "repo": "DrAbdulmalek/marathon_ted_pipeline",
@@ -66,7 +66,7 @@
       ],
       "pr": "#59 (draft)",
       "rollback": "delete the branch; no runtime artifact",
-      "remote_ci_status": "UNVERIFIED for current head in this audit pass"
+      "remote_ci_status": "UNVERIFIED — no PR-triggered workflow runs returned for latest documentation commit 99f1c4998cd567e76934cbd6c51732ab3d9ab09f; inspect path filters or verify via PR checks UI"
     }
   ],
   "not_performed": [
