@@ -6,7 +6,7 @@
       "repo": "DrAbdulmalek/ocr-core",
       "branch": "audit/evidence-scope-line-attribution",
       "base_sha": "e4e80e2370de8a8ebf5fc3f85a9dd1d16f49ebda",
-      "stacked_on": "PR #57 head",
+      "stacked_on": "PR #57 head e4e80e2370de8a8ebf5fc3f85a9dd1d16f49ebda; PR #58 must be reviewed as dependent/stacked",
       "changed_files": [
         "src/ocr_core/rules/engine.py",
         "tests/test_evidence_scope_adversarial.py"
@@ -25,10 +25,11 @@
       },
       "new_commits": [
         "f7d2a8e5295d51d53b59f6bbbf71df1417f9e87d",
-        "<corrective test commit>"
+        "15e1c4644a9b688cdeaa135d220e265f9a6ab61b"
       ],
       "pr": "#58 (draft)",
-      "rollback": "git revert the commits on the branch; main untouched"
+      "rollback": "git revert the commits on the branch; main untouched",
+      "remote_ci_status": "UNVERIFIED for corrective head in this audit pass; do not infer green CI from local test logs"
     },
     {
       "repo": "DrAbdulmalek/marathon_ted_pipeline",
@@ -49,7 +50,8 @@
         "result": "2 passed"
       },
       "behaviour_change": "none",
-      "rollback": "git revert c897389 on the branch"
+      "rollback": "git revert c897389 on the branch",
+      "remote_ci_status": "SUCCESS — run 38179374931 fetched for exact commit c897389a5370809a5972726c9ee9eec663728732"
     },
     {
       "repo": "DrAbdulmalek/ocr-core",
@@ -63,7 +65,8 @@
         "77267822e90f5cb5dc581d2d7a8e90bcac1328fd"
       ],
       "pr": "#59 (draft)",
-      "rollback": "delete the branch; no runtime artifact"
+      "rollback": "delete the branch; no runtime artifact",
+      "remote_ci_status": "UNVERIFIED for current head in this audit pass"
     }
   ],
   "not_performed": [
