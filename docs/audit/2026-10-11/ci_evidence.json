@@ -537,5 +537,27 @@
     "run_id": 38179374931,
     "url": "https://github.com/DrAbdulmalek/marathon_ted_pipeline/actions/runs/38179374931",
     "verification_note": "Fetched live for the exact commit on 2026-10-12; see audit errata."
+  },
+  {
+    "repo": "ocr-core",
+    "workflow": "tests",
+    "branch": "audit/evidence-scope-line-attribution",
+    "head_sha": "15e1c4644a9b688cdeaa135d220e265f9a6ab61b",
+    "event": "pull_request",
+    "conclusion": "success",
+    "run_id": 38179903738,
+    "url": "https://github.com/DrAbdulmalek/ocr-core/actions/runs/38179903738",
+    "verification_note": "Fetched live for exact corrective PR #58 head on 2026-10-12."
+  },
+  {
+    "repo": "ocr-core",
+    "workflow": "Secret Gate",
+    "branch": "audit/evidence-scope-line-attribution",
+    "head_sha": "15e1c4644a9b688cdeaa135d220e265f9a6ab61b",
+    "event": "pull_request",
+    "conclusion": "success",
+    "run_id": 38179903742,
+    "url": "https://github.com/DrAbdulmalek/ocr-core/actions/runs/38179903742",
+    "verification_note": "Fetched live for exact corrective PR #58 head on 2026-10-12."
   }
 ]
