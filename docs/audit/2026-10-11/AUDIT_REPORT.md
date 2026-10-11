@@ -92,3 +92,18 @@ The initial bundle had three provenance inconsistencies; this section supersedes
 - **PR #58 dependency:** it is intentionally stacked on PR #57's head `e4e80e2370de8a8ebf5fc3f85a9dd1d16f49ebda`, not directly on `main`. Review/merge order must preserve this dependency or the branch must be rebased in a separately reviewed change.
 
 Do not interpret historical local test logs as proof of current remote CI. All PRs remain review-gated; no merge is authorized by this report.
+
+
+## 10. Failure root-cause follow-up — 2026-10-12
+
+### Scheduled Tasks — `marathon_ted_pipeline`
+- Failed job `weekly-update`, run [38137407655](https://github.com/DrAbdulmalek/marathon_ted_pipeline/actions/runs/38137407655), reaches `appleboy/ssh-action@v1.0.3` then exits with **`Error: missing server host`**.
+- This is an absent/misnamed repository or environment secret/configuration (the action's host input resolves empty), not evidence of a Python/test failure.
+- **BLOCKED on owner configuration.** Do not add a fake host, weaken the job, auto-skip the deploy, expose secret values, or re-run a production deployment as a diagnostic. Owner should inspect secret names/presence and environment scoping without printing values.
+
+### Build Android APK — `intelli-file-manager`
+- Failed job [113028686735](https://github.com/DrAbdulmalek/intelli-file-manager/actions/runs/37690369977) shows Kivy `2.2.1` Cython compilation errors in `kivy/lib/gstplayer/_gstplayer.pyx`: callback types use `except * nogil` but the expected function pointers are `noexcept`. The failing command builds the experimental `buildozer.spec` app.
+- The repository's root `buildozer.spec` explicitly labels Android/Kivy **experimental and not part of product core**, says the file is historical reference, and directs readers to `mobile/README.md`. Therefore this is **BLOCKED pending owner decision** on whether Android packaging is still supported. If it is, fix the pinned Kivy/Cython/Buildozer toolchain on an isolated branch and require a successful APK artifact; if not, document/retire the workflow only after explicit approval. No workflow or product code was changed.
+
+### Verification boundary
+These are evidence-backed root causes from historical run logs. They do not establish that the failures are still present on the current default-branch heads. Re-check exact current run/head before closing either finding.
