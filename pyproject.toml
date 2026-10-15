@@ -45,3 +45,11 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 ocr_core = ["rules/data/*.yaml", "postprocess/data/*.jsonl", "postprocess/data/*.json", "config/*.yaml", "benchmarks/golden/fonts/*.ttf", "benchmarks/golden/fonts/*.txt"]
+
+[tool.pytest.ini_options]
+# جذر الاستيراد الوحيد = src/ (منع أي تظليل من حزم قديمة على مستوى المستودع).
+# حزمة الظل ocr_core/ v0.4.0 بالجذر حُذفت (كانت تعيد مسار "pre-bidi" القديم
+# لمن يستورد من جذر المستودع — سبب تاريخي لمخرجات عربية معكوسة ≈0.79 CER).
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
