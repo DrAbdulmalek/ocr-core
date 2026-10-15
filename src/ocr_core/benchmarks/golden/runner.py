@@ -225,7 +225,7 @@ def run_golden_benchmark(
         for variant in variants:
             variant_arr = apply_variant(base_gray, variant)
             vpath = workdir / f"{pair.id}.{variant}.png"
-            Image.fromarray(variant_arr, mode="L").save(vpath, format="PNG")
+            Image.fromarray(variant_arr).save(vpath, format="PNG")
 
             ref_norm = arabic_strong_normalize(
                 pair.text, use_medical_dict=use_medical_dict

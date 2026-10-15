@@ -7,6 +7,30 @@
 > marathon-ocr-core[tesseract] @ git+https://github.com/DrAbdulmalek/ocr-core.git@v0.5.0
 > ```
 
+## غير مُصدر (فرع fix/import-shadow-arabic-render)
+
+### أُصلح
+- **حزمة الظل القديمة `ocr_core/` (v0.4.0) في جذر المستودع حُذفت نهائياً** —
+  كانت تعترض الاستيراد وتعيد أي مستهلك يستورد من الجذر إلى مسار الـpre-bidi
+  القديم (الذي وثّق العيّنة الذهبية أنه ينتج ترتيباً معكوساً ≈0.79 CER)،
+  وَجَعلت اختبارات مثل `test_rtl_utils.py` تنهار عند تشغيلها منفردة
+  (كانت تعمل فقط بحظّ ترتيب التحصيل حين يسبقها ملف يحقن `src` في `sys.path`).
+  مرجع الميثاق `charter_v2.yaml` نُقل إلى `docs/` (الميثاق الحقيقي المربوط
+  بـsha يبقى في `src/ocr_core/config/` — لا تغيير).
+- **إصلاح عزم الاستيراد**: `[tool.pytest.ini_options] pythonpath = ["src"]`
+  في `pyproject.toml` — كل الاختبارات تُحلّ الحزمة الحقيقية v0.7.0 حتماً،
+  بلا اعتماد على حيل `sys.path.insert` الفردية (بقيت لكنها أصبحت احتياطية).
+- **Pillow 13**: إسقاط `mode="L"` من `Image.fromarray` في
+  `benchmarks/golden/render.py` و`runner.py` (الوسيط أُلغي في Pillow 13 —
+  الاستدلال من dtype يعطي "L" نفسها).
+
+### التحقق
+- `pytest`: **504 passed, 7 skipped** (سوت كامل أخضر بعد الإصلاح).
+- اختبارات كانت منهارة منفردة (`test_rtl_utils.py`,
+  `test_postprocess_arabic_rtl.py`) تعمل الآن وحدها.
+- فحص بصري لمسار raqm: رسم «مرحبا بالعالم الطبي» بحروف متصلة وترتيب RTL
+  صحيح من الخط المرفق Noto Naskh.
+
 ## غير مُصدر (فرع feat/abbyy-cleanroom-pipeline)
 
 ### أُضيف
