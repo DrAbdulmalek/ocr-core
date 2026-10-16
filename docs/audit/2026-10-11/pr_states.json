@@ -1,0 +1,62 @@
+{
+  "ocr-core#57": {
+    "title": "[SPRINT-2][OCR] Enforce visual evidence before correctness/training labels",
+    "state": "open",
+    "draft": true,
+    "merged": false,
+    "head_ref": "fix/visual-evidence-classification-gate",
+    "head_sha": "e4e80e2370de8a8ebf5fc3f85a9dd1d16f49ebda",
+    "base_ref": "main",
+    "base_sha": "e61683f7590d9f22c163af103a75f3c3e6db42b3",
+    "updated_at": "2026-10-11T21:53:47Z",
+    "html_url": "https://github.com/DrAbdulmalek/ocr-core/pull/57",
+    "changed_files": 7,
+    "additions": 374,
+    "deletions": 81
+  },
+  "omni-medical-suite#166": {
+    "title": "feat(telegram-ocr): استوديو OCR لتيليجرام + تعلم الأنماط/القصاصات + قاعدة تدريب على GitHub",
+    "state": "open",
+    "draft": false,
+    "merged": false,
+    "head_ref": "feat/telegram-ocr-training-db",
+    "head_sha": "8077f5f1a362cea3d6622e51ffc7bcff611405f8",
+    "base_ref": "main",
+    "base_sha": "91dac6db3924667f3ba3f16189d816891cf3b34e",
+    "updated_at": "2026-10-11T15:28:30Z",
+    "html_url": "https://github.com/DrAbdulmalek/omni-medical-suite/pull/166",
+    "changed_files": 18,
+    "additions": 3108,
+    "deletions": 0
+  },
+  "marathon_ted_pipeline#26": {
+    "title": "docs: add Agent-Reach medical and translation source catalog",
+    "state": "open",
+    "draft": true,
+    "merged": false,
+    "head_ref": "docs/agent-reach-medical-source-catalog",
+    "head_sha": "ebf9df7b98dfb23f69e46b32f1d27ba411d4d98a",
+    "base_ref": "main",
+    "base_sha": "bcc0b57f7116a2731c52bac09e17a899639200f0",
+    "updated_at": "2026-10-11T20:59:31Z",
+    "html_url": "https://github.com/DrAbdulmalek/marathon_ted_pipeline/pull/26",
+    "changed_files": 1,
+    "additions": 92,
+    "deletions": 0
+  },
+  "intelli-file-manager#48": {
+    "title": "Harness Engineering v2.0 — عقد الوكلاء + بوابات التحقق + الذاكرة (مسودة)",
+    "state": "open",
+    "draft": true,
+    "merged": false,
+    "head_ref": "feat/harness-engineering",
+    "head_sha": "37920a6ef8ac71aed7ad3ac21d5b65761435eb3e",
+    "base_ref": "main",
+    "base_sha": "a6562a0380d5b58044b4ac8fdc444c053834b440",
+    "updated_at": "2026-10-11T21:41:51Z",
+    "html_url": "https://github.com/DrAbdulmalek/intelli-file-manager/pull/48",
+    "changed_files": 14,
+    "additions": 1735,
+    "deletions": 1
+  }
+}

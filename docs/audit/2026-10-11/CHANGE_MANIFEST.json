@@ -1,0 +1,87 @@
+{
+  "audit_date": "2026-10-11",
+  "protocol": "reversible; every write on a dedicated audit/* branch; production branches untouched",
+  "writes": [
+    {
+      "repo": "DrAbdulmalek/ocr-core",
+      "branch": "audit/evidence-scope-line-attribution",
+      "base_sha": "e4e80e2370de8a8ebf5fc3f85a9dd1d16f49ebda",
+      "stacked_on": "PR #57 head e4e80e2370de8a8ebf5fc3f85a9dd1d16f49ebda; PR #58 must be reviewed as dependent/stacked",
+      "changed_files": [
+        "src/ocr_core/rules/engine.py",
+        "tests/test_evidence_scope_adversarial.py"
+      ],
+      "reason": "R16 attributed visual evidence at line granularity; one marker certified every answer in a line that packed several answers (OCR output without line breaks).",
+      "tests": {
+        "baseline": {
+          "file": "tests/test_evidence_scope_adversarial.py",
+          "result": "3 failed, 14 passed"
+        },
+        "after": {
+          "focused": "23 passed",
+          "full_suite": "515 passed, 7 skipped",
+          "skipped": 7
+        }
+      },
+      "new_commits": [
+        "f7d2a8e5295d51d53b59f6bbbf71df1417f9e87d",
+        "15e1c4644a9b688cdeaa135d220e265f9a6ab61b"
+      ],
+      "pr": "#58 (draft)",
+      "rollback": "git revert the commits on the branch; main untouched",
+      "remote_ci_status": "SUCCESS — exact corrective head 15e1c4644a9b688cdeaa135d220e265f9a6ab61b: tests run 38179903738 and Secret Gate run 38179903742 both success"
+    },
+    {
+      "repo": "DrAbdulmalek/marathon_ted_pipeline",
+      "branch": "audit/charter-engine-compat",
+      "base_sha": "bcc0b57f7116a2731c52bac09e17a899639200f0",
+      "changed_files": [
+        "tests/test_charter_engine_compat.py",
+        "docs/ocr_core_charter_compatibility.json",
+        "docs/OCR_CORE_CHARTER_COMPATIBILITY.md"
+      ],
+      "reason": "Charter declares a visual-evidence rule (R16) but the pinned engine (v0.6.0) does not implement it; no test guarded that contract.",
+      "new_commits": [
+        "c897389a5370809a5972726c9ee9eec663728732"
+      ],
+      "pr": "#27 (draft)",
+      "tests": {
+        "file": "tests/test_charter_engine_compat.py",
+        "result": "2 passed"
+      },
+      "behaviour_change": "none",
+      "rollback": "git revert c897389 on the branch",
+      "remote_ci_status": "SUCCESS — run 38179374931 fetched for exact commit c897389a5370809a5972726c9ee9eec663728732"
+    },
+    {
+      "repo": "DrAbdulmalek/ocr-core",
+      "branch": "audit/ecosystem-2026-10-11",
+      "base_sha": "40221b9197588e1964be4ded8b057cccdb11f83e",
+      "changed_files": [
+        "docs/audit/2026-10-11/** (documentation and JSON evidence only)"
+      ],
+      "reason": "Required audit deliverables A-I.",
+      "new_commits": [
+        "77267822e90f5cb5dc581d2d7a8e90bcac1328fd"
+      ],
+      "pr": "#59 (draft)",
+      "rollback": "delete the branch; no runtime artifact",
+      "remote_ci_status": "UNVERIFIED — no PR-triggered workflow runs returned for latest documentation commit 99f1c4998cd567e76934cbd6c51732ab3d9ab09f; inspect path filters or verify via PR checks UI"
+    }
+  ],
+  "not_performed": [
+    "merge",
+    "close PR",
+    "draft/undraft toggle",
+    "force-push",
+    "history rewrite",
+    "branch/tag/repo/release deletion",
+    "visibility change",
+    "branch-protection change",
+    "archive/unarchive",
+    "dataset publication",
+    "Telegram ingestion/backfill",
+    "token rotation",
+    "repair of the failing Scheduled Tasks / Build Android APK workflows"
+  ]
+}
