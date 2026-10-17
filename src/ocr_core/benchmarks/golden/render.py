@@ -176,4 +176,5 @@ def render_pair(pair: GoldenPair, font_path: Path | None = None) -> Image.Image:
         arr = _apply_shadow(arr, pair.seed)
     elif pair.condition == "noisy":
         arr = _apply_noise(arr, pair.seed)
-    return Image.fromarray(arr, mode="L")
+    # uint8 2-D infers mode "L" (mode= kwarg removed in Pillow 13)
+    return Image.fromarray(arr)
