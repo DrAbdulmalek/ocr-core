@@ -443,7 +443,9 @@ class OCRProcessor:
 
     # نطاق الدليل داخل السطر (المبدأ 9): علامة واحدة لا تُثبت إلا المقطع
     # الذي تلتصق به فعليًا. يُستخدم في R16.
-    _SEGMENT_SPLIT_RE = re.compile(r"[.!?\u061f\u061b\u2026]+")
+    # Do not split decimal medical values such as 1.5 mg or ٣٫٥ (ASCII decimal point).
+    # A dot is a segment boundary only when it is not between digits.
+    _SEGMENT_SPLIT_RE = re.compile(r"(?<![0-9٠-٩۰-۹])[.!?\u061f\u061b\u2026]+(?![0-9٠-٩۰-۹])")
     _MARKER_ONLY_RE = re.compile(r"^[\s\W_]+$", re.UNICODE)
 
     def _evidence_scope_is_line_unambiguous(self, line: str) -> bool:
