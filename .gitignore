@@ -223,3 +223,11 @@ __marimo__/
 .local-fonts/
 .local-tessdata/
 .local-golden-smoke/
+
+
+# Private ABBYY/FineReader assets and local bridge configuration.
+# Never commit licensed weights, extracted model data, scans, or private outputs.
+.local/abbyy/
+private_models/abbyy/
+abbyy_private.json
+abbyy_private.toml
