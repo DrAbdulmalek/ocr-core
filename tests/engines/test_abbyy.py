@@ -109,3 +109,42 @@ def test_file_mode_requires_output_placeholder():
         assert "output" in str(exc)
     else:
         raise AssertionError("file mode must require an {output} placeholder")
+
+
+def test_from_env_without_command_is_unconfigured(monkeypatch):
+    monkeypatch.delenv("OCR_CORE_ABBYY_COMMAND", raising=False)
+    engine = AbbyyFineReaderEngine.from_env()
+    assert not engine.available()
+
+
+def test_from_env_parses_json_argument_vector(monkeypatch):
+    monkeypatch.setenv(
+        "OCR_CORE_ABBYY_COMMAND",
+        '["python", "-c", "print(1)", "{input}"]',
+    )
+    monkeypatch.setenv("OCR_CORE_ABBYY_OUTPUT_MODE", "stdout")
+    monkeypatch.setenv("OCR_CORE_ABBYY_TIMEOUT", "17")
+    engine = AbbyyFineReaderEngine.from_env()
+    assert engine.command == ("python", "-c", "print(1)", "{input}")
+    assert engine.output_mode == "stdout"
+    assert engine.timeout == 17
+
+
+def test_from_env_rejects_shell_string(monkeypatch):
+    monkeypatch.setenv("OCR_CORE_ABBYY_COMMAND", "wine bridge.exe --input {input}")
+    try:
+        AbbyyFineReaderEngine.from_env()
+    except ValueError as exc:
+        assert "JSON array" in str(exc)
+    else:
+        raise AssertionError("a shell command string must be rejected")
+
+
+def test_from_env_rejects_non_string_array_items(monkeypatch):
+    monkeypatch.setenv("OCR_CORE_ABBYY_COMMAND", '["bridge", 3, "{input}", "{output}"]')
+    try:
+        AbbyyFineReaderEngine.from_env()
+    except ValueError as exc:
+        assert "strings" in str(exc)
+    else:
+        raise AssertionError("non-string command arguments must be rejected")
