@@ -238,9 +238,9 @@ rules:
       # --- v2: الميثاق ---
       # require_visual_evidence=true  → نسبة سلامة الكلمات لا تكفي؛ بلا دليل بصري
       #                                 يُصنَّف المقطع `uncertain` (لا correct).
-      # الافتراضي false هنا للحفاظ على سلوك v1 واختباراته؛ فرعه
-      # audit/visual-evidence-rules يقلبها مع تحديث اختباراتها.
-      require_visual_evidence: false
+      # في ميثاق v2 لا تكفي سلامة المحارف لتصنيف النص على أنه صحيح.
+      # التوافق مع v1 يبقى في ملفات v1 المستقلة فقط.
+      require_visual_evidence: true
       uncertain_status: "uncertain"
       evidence_markers_from: visual_markers      # قسم الميثاق
       # --- v1: محفوظ للتوافق (يُقرأ فقط عندما require_visual_evidence=false) ---

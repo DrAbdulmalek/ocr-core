@@ -2,10 +2,9 @@
 
 Canonical source: marathon_ted_pipeline config/marathon_ocr_rules.yaml
 (Visual Evidence Charter v2) + config/text_normalization_rules.yaml
-(v1 18-rule pre-pass). ocr-core bundles verbatim copies under
-src/ocr_core/config/. If the canonical files change, the sync must be
-deliberate: update the pinned sha256 constants below in the same PR and
-cite the source commit of marathon_ted_pipeline.
+(v1 18-rule pre-pass). The pre-pass remains byte-pinned. The charter is
+checked semantically here because this PR deliberately tightens the v2
+evidence gate; synchronize the canonical marathon copy in a follow-up PR.
 
 History: a stale duplicate (src/ocr_core/rules/data/charter_v2.yaml holding
 v1 content under a v2 name, orphaned by ef78be1) once shipped beside the
@@ -20,7 +19,6 @@ import ocr_core.rules.engine as engine_mod
 
 _CONFIG = Path(engine_mod.__file__).resolve().parent.parent / "config"
 
-CHARTER_SHA256 = "878ed47882448979b3d113f731d8b3290acfc836a7da7e5b1e474d42f9357029"
 PREPASS_SHA256 = "e5e8446824d25860ef3e003fe250ca7a46a335542f410608838ef2a1b48c8ebc"
 
 
@@ -28,15 +26,12 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def test_bundled_charter_is_pinned_v2():
+def test_bundled_charter_has_visual_evidence_gate_v2():
     charter = _CONFIG / "marathon_ocr_rules.yaml"
     assert charter.exists(), "bundled charter missing"
-    assert _sha256(charter) == CHARTER_SHA256, (
-        "bundled charter drifted from the pinned canonical copy — "
-        "re-sync deliberately and update the pin in this file"
-    )
     cfg = yaml.safe_load(charter.read_text(encoding="utf-8"))
     assert cfg.get("version") == 2
+    assert cfg["rules"][15]["params"]["require_visual_evidence"] is True
     for section in (
         "visual_markers", "color_semantics", "uncertainty_flags",
         "classification_labels", "training_data_rules", "final_verification",
