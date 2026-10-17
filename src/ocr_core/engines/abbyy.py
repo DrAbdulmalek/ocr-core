@@ -15,6 +15,8 @@ validated adapter can parse a genuine score from the installed product.
 """
 from __future__ import annotations
 
+import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -62,6 +64,34 @@ class AbbyyFineReaderEngine(OCREngine):
             "{output}" in part for part in self.command
         ):
             raise ValueError("file output mode requires the {output} placeholder")
+
+    @classmethod
+    def from_env(cls) -> "AbbyyFineReaderEngine":
+        """Build the adapter from local environment configuration.
+
+        OCR_CORE_ABBYY_COMMAND must be a JSON array of arguments, not a shell
+        command string. This keeps private machine paths/configuration out of
+        source control. Example:
+        ["wine", "/opt/abbyy/bridge.exe", "--input", "{input}", "--output", "{output}"]
+        """
+        raw_command = os.environ.get("OCR_CORE_ABBYY_COMMAND", "").strip()
+        if not raw_command:
+            return cls()
+        try:
+            command = json.loads(raw_command)
+        except json.JSONDecodeError as exc:
+            raise ValueError("OCR_CORE_ABBYY_COMMAND must be a JSON array") from exc
+        if not isinstance(command, list) or not command or not all(
+            isinstance(item, str) for item in command
+        ):
+            raise ValueError("OCR_CORE_ABBYY_COMMAND must be a non-empty JSON array of strings")
+        output_mode = os.environ.get("OCR_CORE_ABBYY_OUTPUT_MODE", "file").strip().lower()
+        timeout_raw = os.environ.get("OCR_CORE_ABBYY_TIMEOUT", "120").strip()
+        try:
+            timeout = float(timeout_raw)
+        except ValueError as exc:
+            raise ValueError("OCR_CORE_ABBYY_TIMEOUT must be numeric") from exc
+        return cls(command, output_mode=output_mode, timeout=timeout)
 
     def available(self) -> bool:
         """Return true only when a configured executable resolves on this host."""
