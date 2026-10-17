@@ -70,3 +70,12 @@ def test_explicit_positive_marker_can_classify_one_unambiguous_answer(proc):
     assert "Q1" in result["correct"]
     assert result["wrong"] == ""
     assert result["uncertain"] == ""
+
+
+@pytest.mark.parametrize("dose", ["1.5 mg", "0.25 mL", "2.75 mg/kg"])
+def test_decimal_medical_values_do_not_create_false_answer_segments(proc, dose):
+    # Decimal points inside clinical quantities are not sentence boundaries.
+    result = proc.process_text(f"Q1: verified dosage {dose}. ✓")
+    assert result["classification"] == "correct"
+    assert "verified dosage" in result["correct"]
+    assert result["uncertain"] == ""
