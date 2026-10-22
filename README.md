@@ -9,6 +9,7 @@
 - [x] محرك Tesseract (stage 5)
 - [x] محرك PaddleOCR منقول من omni-medical-suite — extra: `pip install .[paddle]`
 - [x] محرك EasyOCR منقول من omni-medical-suite — extra: `pip install .[easyocr]`
+- [ ] محرك Indra OCR CPU/ONNX (PR تجريبي مفتوح) — extra: `pip install .[indra]`
 - [x] EnsembleEngine + EngineRouter + telemetry (PR #6)
 - [x] Preprocess (scanner_fixer) (PR #6) — extra: `pip install .[preprocess]`
 - [x] Postprocess طبي: normalization / field_extractor / deduplication (PR #6)
@@ -95,3 +96,28 @@ fields = ArabicMedicalFieldExtractor().extract_fields(fixed_text)
 
 ### 3. الأوراق البحثية (Academic Papers)
 - بدلاً من محاولة استخراج خوارزميات مغلقة، يمكنك البحث في منصات مثل arXiv عن أوراق بحثية حول "Arabic OCR Deep Learning" أو "Scene Text Recognition". هذه الأوراق تشرح الخوارزميات الرياضية والمعمارية بدقة وتفصيل علمي.
+
+
+## محرك Indra OCR (اختياري — CPU/ONNX)
+
+يوفّر `IndraEngine` محوّلاً اختيارياً إلى [Datalab Indra OCR](https://github.com/datalab-to/indra)، مع مخرجات النص والصفحات ومربعات السطور وكتل التخطيط وترتيب القراءة داخل `OCRResult.meta["page_results"]`. لا يحمّل المحرك حزمة Indra عند استيراد `ocr_core`، ولا يحتاج PyTorch أو GPU.
+
+```bash
+pip install -e ".[indra]"
+```
+
+```python
+from ocr_core.engines.indra import IndraEngine
+
+engine = IndraEngine(threads=4)
+result = engine.process_pdf("document.pdf")
+if result.error:
+    print("OCR failed:", result.error)
+else:
+    print(result.text)
+    print(result.meta["page_results"])  # page layout, lines, boxes and source
+```
+
+**الترخيص:** كود Indra مرخّص Apache-2.0، لكن أوزان النموذج تستخدم ترخيص OpenRAIL-M معدّلاً بشروط منفصلة، بما فيها قيود على الاستخدام التجاري/التنافسي. راجع الترخيص الأصلي قبل النشر أو الاستخدام التجاري. هذا المحوّل لا يضمّن الأوزان ولا ينزّلها أثناء التثبيت؛ تحميل النموذج الأول يتم وفق سلوك Indra عند التشغيل.
+
+**تنبيه طبي:** Indra محرك OCR عام وليس مصدراً موثوقاً مستقلاً للجرعات أو النفي أو أسماء الأدوية. لا تُستخدم نتيجته وحدها لاتخاذ قرار سريري؛ أبقِ مراجعة بشرية وبوابات حماية الحقول الطبية مفعّلة.
