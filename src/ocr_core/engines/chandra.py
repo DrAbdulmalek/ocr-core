@@ -6,6 +6,7 @@ verified Chandra output contract supplies a genuine confidence value.
 """
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import tempfile
@@ -14,6 +15,29 @@ from pathlib import Path
 from typing import Optional
 
 from ocr_core.engines.base import OCREngine, OCRResult
+
+
+def _read_chandra_metadata(markdown_path: Path):
+    """Parse the sibling ``<stem>_metadata.json`` written by chandra-ocr 0.2.0.
+
+    Verified against the real CLI (chandra/scripts/cli.py::save_merged_output,
+    chandra-ocr==0.2.0 and a live run): the file sits next to ``<stem>.md`` and
+    holds ``num_pages``, ``total_token_count``, ``total_chunks``,
+    ``total_images`` and a per-page list. Missing or unreadable metadata is
+    never fatal: the page count simply stays unknown and nothing is fabricated.
+    Returns ``(metadata_dict_or_None, status)`` with status in
+    ``{"parsed", "missing", "corrupt"}``.
+    """
+    metadata_path = markdown_path.parent / f"{markdown_path.stem}_metadata.json"
+    if not metadata_path.is_file():
+        return None, "missing"
+    try:
+        parsed = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError):
+        return None, "corrupt"
+    if not isinstance(parsed, dict):
+        return None, "corrupt"
+    return parsed, "parsed"
 
 
 class ChandraEngine(OCREngine):
@@ -127,23 +151,72 @@ class ChandraEngine(OCREngine):
                     )
 
                 text = expected[0].read_text(encoding="utf-8")
+                metadata, metadata_status = _read_chandra_metadata(expected[0])
+
+                meta = {
+                    "provider": "datalab-to/chandra",
+                    "method": self.method,
+                    "runtime": "chandra-cli",
+                    "output_format": "markdown",
+                    "confidence_status": "unknown",
+                    "metadata_status": metadata_status,
+                    "page_count_status": "known_image" if is_image else "unknown",
+                    "requested_max_pages": max_pages,
+                }
+
+                pages = 1 if is_image else 0
+                num_pages = (metadata or {}).get("num_pages")
+                if (
+                    isinstance(num_pages, int)
+                    and not isinstance(num_pages, bool)
+                    and num_pages >= 1
+                ):
+                    pages = num_pages
+                    meta["page_count_status"] = "known_metadata"
+
+                token_count = (metadata or {}).get("total_token_count")
+                if (
+                    isinstance(token_count, int)
+                    and not isinstance(token_count, bool)
+                    and token_count == 0
+                ):
+                    # Verified against chandra-ocr 0.2.0: failed generation
+                    # records zero tokens while the CLI still exits 0. Surfaced
+                    # as evidence; the converse (non-empty text with zero
+                    # tokens) is not proven to be a failure, so it does not
+                    # reject the result by itself.
+                    meta["generation_evidence"] = "zero_tokens_recorded"
+
+                if not text.strip():
+                    # Live-verified chandra-ocr 0.2.0 behavior: when inference
+                    # fails (e.g. vLLM backend unreachable) the CLI retries,
+                    # then still exits 0 and writes an EMPTY .md. Accepting that
+                    # as a successful blank page would silently swallow the
+                    # failure, so it is reported as an explicit error instead.
+                    return OCRResult(
+                        text="", engine=self.name,
+                        confidence=0.0,
+                        processing_time=time.perf_counter() - started,
+                        pages=0,
+                        error=(
+                            "Chandra CLI produced empty Markdown output; the CLI "
+                            "exits 0 even when inference fails, so this is treated "
+                            "as a failure rather than a blank page."
+                        ),
+                        meta={
+                            **meta,
+                            "empty_output": True,
+                            "returncode": completed.returncode,
+                        },
+                    )
+
                 return OCRResult(
                     text=text,
                     engine=self.name,
                     confidence=0.0,
                     processing_time=time.perf_counter() - started,
-                    # The CLI's metadata schema is not yet parsed, so PDF page
-                    # counts remain unknown rather than reporting a requested cap.
-                    pages=(1 if is_image else 0),
-                    meta={
-                        "provider": "datalab-to/chandra",
-                        "method": self.method,
-                        "runtime": "chandra-cli",
-                        "output_format": "markdown",
-                        "confidence_status": "unknown",
-                        "page_count_status": "known_image" if is_image else "unknown",
-                        "requested_max_pages": max_pages,
-                    },
+                    pages=pages,
+                    meta=meta,
                 )
         except subprocess.TimeoutExpired:
             return OCRResult(
