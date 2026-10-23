@@ -29,6 +29,8 @@ word-detect = ["marathon-ocr-core[preprocess]", "onnxruntime>=1.17", "huggingfac
 # ⚠️ ترخيص الأوزان: CC BY-NC 4.0 (غير تجاري) — الكود هنا MIT،
 #    الأوزان تُحمّل وقت التشغيل من HuggingFace.
 jina = ["torch>=2.2", "transformers>=4.45", "torchvision>=0.17", "accelerate>=0.29", "safetensors>=0.4", "pillow>=10.0"]
+# Optional Datalab Chandra CLI adapter; model weights are not bundled and have separate license restrictions.
+chandra = ["chandra-ocr>=0.2.0"]
 # مزيج VLM الموصى به (jina + PDF→صور + تصدير DOCX لأوامر commands)
 vlm = ["marathon-ocr-core[jina]", "pymupdf>=1.23", "python-docx>=1.1"]
 pdf = ["pymupdf>=1.23"]
