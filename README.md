@@ -101,7 +101,7 @@ fields = ArabicMedicalFieldExtractor().extract_fields(fixed_text)
 
 - Optional CLI adapter: `pip install -e ".[chandra]"`
 - Supports explicit local `hf` or configured `vllm` backend; no implicit hosted API fallback.
-- Returns Markdown; confidence remains unknown (`0.0`). Model weights are not bundled.
+- Returns Markdown; confidence remains unknown (`0.0`). Model weights are not bundled. Empty Markdown output is reported as a failure (the 0.2.0 CLI exits 0 even when inference fails); PDF page counts are read from `<stem>_metadata.json` when valid, otherwise stay unknown.
 - Chandra is a large vision-language model; CPU-only use may be too slow or memory-intensive on a 16 GB laptop.
 - The code is Apache-2.0, but model weights use a modified OpenRAIL-M license with separate restrictions. Review `docs/chandra_ocr.md` and the upstream `MODEL_LICENSE` before commercial/clinical deployment.
-- Validation status: proposed adapter; real-model, Arabic medical CER/WER, and layout tests remain pending.
+- Validation status: proposed adapter; real-model, Arabic medical CER/WER, and layout tests remain pending. Locally verified (2026-10-23): CLI contract, output layout, crash surfacing, and empty-output failure semantics against chandra-ocr 0.2.0.

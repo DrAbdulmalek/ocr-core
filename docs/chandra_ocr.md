@@ -35,7 +35,11 @@ else:
     print(result.text)
 ```
 
-Outputs are Markdown, so structural markers are intentionally preserved. Confidence is always `0.0` (unknown); no confidence is fabricated. For PDFs, the page count remains unknown (0) until the adapter parses a verified metadata schema. The temporary output directory is removed after reading the result.
+Outputs are Markdown, so structural markers are intentionally preserved. Confidence is always `0.0` (unknown); no confidence is fabricated.
+
+Failure semantics (verified live against chandra-ocr 0.2.0): the CLI exits 0 and writes an EMPTY `<stem>.md` even when inference fails (for example, an unreachable vLLM backend, after internal retries). The adapter therefore treats empty or whitespace-only Markdown output as an explicit failure, never as a successful blank page.
+
+Page counts for PDFs are read from the sibling `<stem>_metadata.json` when that file exists and is valid (schema verified against chandra-ocr 0.2.0: `num_pages`, `total_token_count`, `total_chunks`, per-page list). When the metadata is missing or unreadable the page count stays unknown (0) and nothing is fabricated; when the metadata records `total_token_count: 0`, the result carries a `generation_evidence: zero_tokens_recorded` flag for downstream diagnosis. The temporary output directory is removed after reading the result.
 
 ## Privacy, clinical safety, and licensing
 
@@ -47,3 +51,5 @@ Outputs are Markdown, so structural markers are intentionally preserved. Confide
 ## Validation status
 
 This adapter and its tests are a proposal. Mocked tests validate command construction and result handling only; they do not prove that a real Chandra model can load, run on CPU, read Arabic medical records, or meet a performance target. Those require an isolated smoke test and a versioned Arabic/English medical golden set with CER/WER and layout checks.
+
+Verified so far (2026-10-23, chandra-ocr 0.2.0 base install, no model weights): CLI argument contract (`--method`, `--page-range`), output layout (`<output>/<stem>/<stem>.md` plus sibling `<stem>_metadata.json`), hf-backend crash surfacing (non-zero exit is reported), and the empty-output failure semantics above, reproduced by a dedicated regression test before and after the fix. Not yet verified: real-model inference on this hardware (weights are ~10.6 GB), Arabic medical OCR quality (CER/WER on a medical golden set), and the vLLM path against a live server.
