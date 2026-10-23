@@ -95,3 +95,13 @@ fields = ArabicMedicalFieldExtractor().extract_fields(fixed_text)
 
 ### 3. الأوراق البحثية (Academic Papers)
 - بدلاً من محاولة استخراج خوارزميات مغلقة، يمكنك البحث في منصات مثل arXiv عن أوراق بحثية حول "Arabic OCR Deep Learning" أو "Scene Text Recognition". هذه الأوراق تشرح الخوارزميات الرياضية والمعمارية بدقة وتفصيل علمي.
+
+
+## Chandra OCR (proposed optional adapter)
+
+- Optional CLI adapter: `pip install -e ".[chandra]"`
+- Supports explicit local `hf` or configured `vllm` backend; no implicit hosted API fallback.
+- Returns Markdown; confidence remains unknown (`0.0`). Model weights are not bundled.
+- Chandra is a large vision-language model; CPU-only use may be too slow or memory-intensive on a 16 GB laptop.
+- The code is Apache-2.0, but model weights use a modified OpenRAIL-M license with separate restrictions. Review `docs/chandra_ocr.md` and the upstream `MODEL_LICENSE` before commercial/clinical deployment.
+- Validation status: proposed adapter; real-model, Arabic medical CER/WER, and layout tests remain pending.
