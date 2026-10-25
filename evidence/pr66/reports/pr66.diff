@@ -1,0 +1,709 @@
+diff --git a/README.md b/README.md
+index c72f015..bd360d1 100644
+--- a/README.md
++++ b/README.md
+@@ -95,3 +95,13 @@ fields = ArabicMedicalFieldExtractor().extract_fields(fixed_text)
+ 
+ ### 3. الأوراق البحثية (Academic Papers)
+ - بدلاً من محاولة استخراج خوارزميات مغلقة، يمكنك البحث في منصات مثل arXiv عن أوراق بحثية حول "Arabic OCR Deep Learning" أو "Scene Text Recognition". هذه الأوراق تشرح الخوارزميات الرياضية والمعمارية بدقة وتفصيل علمي.
++
++
++## Chandra OCR (proposed optional adapter)
++
++- Optional CLI adapter: `pip install -e ".[chandra]"`
++- Supports explicit local `hf` or configured `vllm` backend; no implicit hosted API fallback.
++- Returns Markdown; confidence remains unknown (`0.0`). Model weights are not bundled. Empty Markdown output is reported as a failure (the 0.2.0 CLI exits 0 even when inference fails); PDF page counts are read from `<stem>_metadata.json` when valid, otherwise stay unknown.
++- Chandra is a large vision-language model; CPU-only use may be too slow or memory-intensive on a 16 GB laptop.
++- The code is Apache-2.0, but model weights use a modified OpenRAIL-M license with separate restrictions. Review `docs/chandra_ocr.md` and the upstream `MODEL_LICENSE` before commercial/clinical deployment.
++- Validation status: proposed adapter; real-model, Arabic medical CER/WER, and layout tests remain pending. Locally verified (2026-10-23): CLI contract, output layout, crash surfacing, and empty-output failure semantics against chandra-ocr 0.2.0.
+diff --git a/docs/chandra_ocr.md b/docs/chandra_ocr.md
+new file mode 100644
+index 0000000..8a69a18
+--- /dev/null
++++ b/docs/chandra_ocr.md
+@@ -0,0 +1,55 @@
++# Chandra OCR adapter (optional)
++
++This adapter invokes the documented Datalab Chandra CLI as a local subprocess and reads its Markdown output. It does not import PyTorch or Chandra into the core process, bundle model weights, call a hosted API, or silently switch to a remote service.
++
++## Install
++
++Install the adapter's CLI dependency:
++
++```bash
++pip install -e ".[chandra]"
++```
++
++For local Hugging Face inference, install Chandra's heavyweight HF dependencies in the same environment:
++
++```bash
++pip install "chandra-ocr[hf]>=0.2.0"
++```
++
++Chandra documents two inference methods:
++- `hf`: local Hugging Face inference.
++- `vllm`: expects a separately configured vLLM server. Verify that its endpoint is local or explicitly controlled; this adapter does not configure or launch a server.
++
++The adapter passes `--method` explicitly and defaults to `hf` to avoid an implicit server/backend choice. This is not a promise of acceptable CPU performance: Chandra is a large vision-language OCR model, and CPU-only inference on a 16 GB laptop may be impractically slow or memory-constrained. Validate in a separate environment before using it on routine workloads.
++
++## Usage
++
++```python
++from ocr_core.engines.chandra import ChandraEngine
++
++engine = ChandraEngine(method="hf", timeout=900)
++result = engine.process_pdf("document.pdf", max_pages=3)
++if result.error:
++    print("Chandra failed:", result.error)
++else:
++    print(result.text)
++```
++
++Outputs are Markdown, so structural markers are intentionally preserved. Confidence is always `0.0` (unknown); no confidence is fabricated.
++
++Failure semantics (verified live against chandra-ocr 0.2.0): the CLI exits 0 and writes an EMPTY `<stem>.md` even when inference fails (for example, an unreachable vLLM backend, after internal retries). The adapter therefore treats empty or whitespace-only Markdown output as an explicit failure, never as a successful blank page.
++
++Page counts for PDFs are read from the sibling `<stem>_metadata.json` when that file exists and is valid (schema verified against chandra-ocr 0.2.0: `num_pages`, `total_token_count`, `total_chunks`, per-page list). When the metadata is missing or unreadable the page count stays unknown (0) and nothing is fabricated; when the metadata records `total_token_count: 0`, the result carries a `generation_evidence: zero_tokens_recorded` flag for downstream diagnosis. The temporary output directory is removed after reading the result.
++
++## Privacy, clinical safety, and licensing
++
++- The adapter runs a local CLI. It does not upload documents itself, but a user-configured vLLM endpoint may be remote; verify the endpoint before processing confidential material.
++- Never send identifiable patient documents to an unapproved remote endpoint. Use synthetic/de-identified test fixtures and keep patient data out of Git, CI logs, and benchmark artifacts.
++- The repository's code is Apache-2.0, but Chandra's model weights are under a modified OpenRAIL-M license with additional use restrictions. Review the current upstream `MODEL_LICENSE` and Datalab commercial-usage terms before downloading, redistributing weights, offering a service, or using it in a commercial clinical workflow.
++- Chandra output must not independently determine medication doses, negation, diagnosis, or other clinical decisions. Apply the medical review and evidence/provenance gates downstream.
++
++## Validation status
++
++This adapter and its tests are a proposal. Mocked tests validate command construction and result handling only; they do not prove that a real Chandra model can load, run on CPU, read Arabic medical records, or meet a performance target. Those require an isolated smoke test and a versioned Arabic/English medical golden set with CER/WER and layout checks.
++
++Verified so far (2026-10-23, chandra-ocr 0.2.0 base install, no model weights): CLI argument contract (`--method`, `--page-range`), output layout (`<output>/<stem>/<stem>.md` plus sibling `<stem>_metadata.json`), hf-backend crash surfacing (non-zero exit is reported), and the empty-output failure semantics above, reproduced by a dedicated regression test before and after the fix. Not yet verified: real-model inference on this hardware (weights are ~10.6 GB), Arabic medical OCR quality (CER/WER on a medical golden set), and the vLLM path against a live server.
+diff --git a/pyproject.toml b/pyproject.toml
+index 3b2279f..fd93ccf 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -29,6 +29,8 @@ word-detect = ["marathon-ocr-core[preprocess]", "onnxruntime>=1.17", "huggingfac
+ # ⚠️ ترخيص الأوزان: CC BY-NC 4.0 (غير تجاري) — الكود هنا MIT،
+ #    الأوزان تُحمّل وقت التشغيل من HuggingFace.
+ jina = ["torch>=2.2", "transformers>=4.45", "torchvision>=0.17", "accelerate>=0.29", "safetensors>=0.4", "pillow>=10.0"]
++# Optional Datalab Chandra CLI adapter; model weights are not bundled and have separate license restrictions.
++chandra = ["chandra-ocr>=0.2.0"]
+ # مزيج VLM الموصى به (jina + PDF→صور + تصدير DOCX لأوامر commands)
+ vlm = ["marathon-ocr-core[jina]", "pymupdf>=1.23", "python-docx>=1.1"]
+ pdf = ["pymupdf>=1.23"]
+diff --git a/src/ocr_core/engines/chandra.py b/src/ocr_core/engines/chandra.py
+new file mode 100644
+index 0000000..ac4d60a
+--- /dev/null
++++ b/src/ocr_core/engines/chandra.py
+@@ -0,0 +1,236 @@
++"""Optional adapter for Datalab Chandra OCR via its documented CLI.
++
++The adapter invokes the local CLI without a shell and does not call a hosted API.
++Model weights are not bundled. Confidence remains unknown unless a future,
++verified Chandra output contract supplies a genuine confidence value.
++"""
++from __future__ import annotations
++
++import json
++import shutil
++import subprocess
++import tempfile
++import time
++from pathlib import Path
++from typing import Optional
++
++from ocr_core.engines.base import OCREngine, OCRResult
++
++
++def _read_chandra_metadata(markdown_path: Path):
++    """Parse the sibling ``<stem>_metadata.json`` written by chandra-ocr 0.2.0.
++
++    Verified against the real CLI (chandra/scripts/cli.py::save_merged_output,
++    chandra-ocr==0.2.0 and a live run): the file sits next to ``<stem>.md`` and
++    holds ``num_pages``, ``total_token_count``, ``total_chunks``,
++    ``total_images`` and a per-page list. Missing or unreadable metadata is
++    never fatal: the page count simply stays unknown and nothing is fabricated.
++    Returns ``(metadata_dict_or_None, status)`` with status in
++    ``{"parsed", "missing", "corrupt"}``.
++    """
++    metadata_path = markdown_path.parent / f"{markdown_path.stem}_metadata.json"
++    if not metadata_path.is_file():
++        return None, "missing"
++    try:
++        parsed = json.loads(metadata_path.read_text(encoding="utf-8"))
++    except (OSError, UnicodeError, ValueError):
++        return None, "corrupt"
++    if not isinstance(parsed, dict):
++        return None, "corrupt"
++    return parsed, "parsed"
++
++
++class ChandraEngine(OCREngine):
++    """Run Chandra OCR using a local Hugging Face or configured vLLM backend."""
++
++    name = "chandra"
++
++    def __init__(
++        self,
++        method: str = "hf",
++        executable: str = "chandra",
++        timeout: int = 900,
++    ) -> None:
++        if method not in {"hf", "vllm"}:
++            raise ValueError("method must be 'hf' or 'vllm'")
++        if timeout < 1:
++            raise ValueError("timeout must be >= 1")
++        self.method = method
++        self.executable = executable
++        self.timeout = timeout
++
++    def available(self) -> bool:
++        """Return whether the configured Chandra CLI executable is on PATH."""
++        return shutil.which(self.executable) is not None
++
++    def process_image(self, image_path) -> OCRResult:
++        return self._process_document(image_path, max_pages=None, is_image=True)
++
++    def process_pdf(self, pdf_path, max_pages: Optional[int] = None) -> OCRResult:
++        if max_pages is not None and max_pages < 1:
++            return OCRResult(
++                text="", engine=self.name,
++                error="max_pages must be >= 1 when provided", pages=0,
++            )
++        return self._process_document(pdf_path, max_pages=max_pages, is_image=False)
++
++    def _process_document(self, document_path, max_pages, is_image: bool) -> OCRResult:
++        path = Path(document_path)
++        if not path.is_file():
++            return OCRResult(
++                text="", engine=self.name,
++                error=f"Input file not found or not a file: {path}", pages=0,
++            )
++        if not self.available():
++            return OCRResult(
++                text="", engine=self.name,
++                error=(
++                    f"Chandra CLI '{self.executable}' is unavailable; install "
++                    "'marathon-ocr-core[chandra]' and the selected Chandra backend."
++                ),
++                pages=0,
++                meta={"provider": "datalab-to/chandra", "method": self.method},
++            )
++
++        started = time.perf_counter()
++        try:
++            with tempfile.TemporaryDirectory(prefix="ocr-core-chandra-") as tmp:
++                output_dir = Path(tmp) / "output"
++                output_dir.mkdir()
++                command = [
++                    self.executable, str(path), str(output_dir),
++                    "--method", self.method,
++                ]
++                if not is_image and max_pages is not None:
++                    command.extend(["--page-range", f"1-{max_pages}"])
++
++                completed = subprocess.run(
++                    command,
++                    check=False,
++                    capture_output=True,
++                    text=True,
++                    timeout=self.timeout,
++                    shell=False,
++                )
++                if completed.returncode != 0:
++                    detail = (completed.stderr or completed.stdout or "").strip()
++                    return OCRResult(
++                        text="", engine=self.name,
++                        processing_time=time.perf_counter() - started,
++                        pages=0,
++                        error=(
++                            f"Chandra CLI exited with status {completed.returncode}"
++                            + (f": {detail[-2000:]}" if detail else "")
++                        ),
++                        meta={
++                            "provider": "datalab-to/chandra",
++                            "method": self.method,
++                            "returncode": completed.returncode,
++                        },
++                    )
++
++                expected = list(output_dir.rglob(f"{path.stem}.md"))
++                if not expected:
++                    markdown_files = list(output_dir.rglob("*.md"))
++                    if len(markdown_files) == 1:
++                        expected = markdown_files
++                if len(expected) != 1:
++                    return OCRResult(
++                        text="", engine=self.name,
++                        processing_time=time.perf_counter() - started,
++                        pages=0,
++                        error=(
++                            "Chandra completed but did not produce one unambiguous "
++                            "Markdown result file."
++                        ),
++                        meta={
++                            "provider": "datalab-to/chandra",
++                            "method": self.method,
++                            "markdown_candidates": len(expected),
++                        },
++                    )
++
++                text = expected[0].read_text(encoding="utf-8")
++                metadata, metadata_status = _read_chandra_metadata(expected[0])
++
++                meta = {
++                    "provider": "datalab-to/chandra",
++                    "method": self.method,
++                    "runtime": "chandra-cli",
++                    "output_format": "markdown",
++                    "confidence_status": "unknown",
++                    "metadata_status": metadata_status,
++                    "page_count_status": "known_image" if is_image else "unknown",
++                    "requested_max_pages": max_pages,
++                }
++
++                pages = 1 if is_image else 0
++                num_pages = (metadata or {}).get("num_pages")
++                if (
++                    isinstance(num_pages, int)
++                    and not isinstance(num_pages, bool)
++                    and num_pages >= 1
++                ):
++                    pages = num_pages
++                    meta["page_count_status"] = "known_metadata"
++
++                token_count = (metadata or {}).get("total_token_count")
++                if (
++                    isinstance(token_count, int)
++                    and not isinstance(token_count, bool)
++                    and token_count == 0
++                ):
++                    # Verified against chandra-ocr 0.2.0: failed generation
++                    # records zero tokens while the CLI still exits 0. Surfaced
++                    # as evidence; the converse (non-empty text with zero
++                    # tokens) is not proven to be a failure, so it does not
++                    # reject the result by itself.
++                    meta["generation_evidence"] = "zero_tokens_recorded"
++
++                if not text.strip():
++                    # Live-verified chandra-ocr 0.2.0 behavior: when inference
++                    # fails (e.g. vLLM backend unreachable) the CLI retries,
++                    # then still exits 0 and writes an EMPTY .md. Accepting that
++                    # as a successful blank page would silently swallow the
++                    # failure, so it is reported as an explicit error instead.
++                    return OCRResult(
++                        text="", engine=self.name,
++                        confidence=0.0,
++                        processing_time=time.perf_counter() - started,
++                        pages=0,
++                        error=(
++                            "Chandra CLI produced empty Markdown output; the CLI "
++                            "exits 0 even when inference fails, so this is treated "
++                            "as a failure rather than a blank page."
++                        ),
++                        meta={
++                            **meta,
++                            "empty_output": True,
++                            "returncode": completed.returncode,
++                        },
++                    )
++
++                return OCRResult(
++                    text=text,
++                    engine=self.name,
++                    confidence=0.0,
++                    processing_time=time.perf_counter() - started,
++                    pages=pages,
++                    meta=meta,
++                )
++        except subprocess.TimeoutExpired:
++            return OCRResult(
++                text="", engine=self.name,
++                processing_time=time.perf_counter() - started,
++                pages=0,
++                error=f"Chandra CLI timed out after {self.timeout} seconds",
++                meta={"provider": "datalab-to/chandra", "method": self.method},
++            )
++        except (OSError, UnicodeError) as exc:
++            return OCRResult(
++                text="", engine=self.name,
++                processing_time=time.perf_counter() - started,
++                pages=0,
++                error=f"{type(exc).__name__}: {exc}",
++                meta={"provider": "datalab-to/chandra", "method": self.method},
++            )
+diff --git a/tests/test_chandra_engine.py b/tests/test_chandra_engine.py
+new file mode 100644
+index 0000000..e8caf8a
+--- /dev/null
++++ b/tests/test_chandra_engine.py
+@@ -0,0 +1,269 @@
++from pathlib import Path
++import json
++import subprocess
++
++from ocr_core.engines.chandra import ChandraEngine
++
++
++def _fake_cli_result(command, md_text, metadata=None):
++    """Simulate a real chandra-ocr 0.2.0 CLI run inside the adapter's tempdir.
++
++    Verified real output layout (chandra/scripts/cli.py::save_merged_output,
++    confirmed by a live run against chandra-ocr==0.2.0):
++      <output>/<stem>/<stem>.md and sibling <stem>/<stem>_metadata.json
++    The real CLI exits 0 even when inference fails (e.g. unreachable vLLM
++    backend) and then writes an EMPTY .md plus metadata with total_token_count 0.
++    """
++    output_dir = Path(command[2])
++    stem = Path(command[1]).stem
++    result_dir = output_dir / stem
++    result_dir.mkdir(parents=True)
++    (result_dir / f"{stem}.md").write_text(md_text, encoding="utf-8")
++    if metadata is not None:
++        (result_dir / f"{stem}_metadata.json").write_text(
++            json.dumps(metadata), encoding="utf-8"
++        )
++    return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
++
++
++def test_chandra_runs_cli_and_reads_markdown(monkeypatch, tmp_path):
++    source = tmp_path / "scan.png"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: "/usr/bin/chandra")
++
++    def fake_run(command, **kwargs):
++        assert command[command.index("--method") + 1] == "hf"
++        output_dir = Path(command[2])
++        result_dir = output_dir / source.stem
++        result_dir.mkdir(parents=True)
++        (result_dir / f"{source.stem}.md").write_text("تقرير طبي", encoding="utf-8")
++        assert kwargs["shell"] is False
++        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
++
++    monkeypatch.setattr("ocr_core.engines.chandra.subprocess.run", fake_run)
++    result = ChandraEngine(method="hf").process_image(source)
++
++    assert result.ok
++    assert result.text == "تقرير طبي"
++    assert result.engine == "chandra"
++    assert result.confidence == 0.0
++    assert result.pages == 1
++    assert result.meta["confidence_status"] == "unknown"
++
++
++def test_chandra_missing_input(tmp_path):
++    result = ChandraEngine().process_image(tmp_path / "missing.png")
++    assert not result.ok
++    assert result.pages == 0
++
++
++def test_chandra_missing_cli(monkeypatch, tmp_path):
++    source = tmp_path / "scan.png"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: None)
++
++    result = ChandraEngine().process_image(source)
++
++    assert not result.ok
++    assert "unavailable" in result.error
++
++
++def test_chandra_rejects_invalid_method():
++    try:
++        ChandraEngine(method="cloud")
++    except ValueError as exc:
++        assert "method" in str(exc)
++    else:
++        raise AssertionError("invalid method should be rejected")
++
++
++def test_chandra_pdf_page_limit_is_passed_to_cli(monkeypatch, tmp_path):
++    source = tmp_path / "scan.pdf"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: "/usr/bin/chandra")
++    seen = {}
++
++    def fake_run(command, **kwargs):
++        seen["command"] = command
++        out = Path(command[2]) / source.stem
++        out.mkdir(parents=True)
++        (out / f"{source.stem}.md").write_text("page text", encoding="utf-8")
++        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
++
++    monkeypatch.setattr("ocr_core.engines.chandra.subprocess.run", fake_run)
++    result = ChandraEngine().process_pdf(source, max_pages=2)
++
++    assert result.ok
++    assert seen["command"][seen["command"].index("--page-range") + 1] == "1-2"
++    assert result.pages == 0
++    assert result.meta["page_count_status"] == "unknown"
++
++
++def test_chandra_timeout_is_reported(monkeypatch, tmp_path):
++    source = tmp_path / "scan.png"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: "/usr/bin/chandra")
++
++    def timeout(*args, **kwargs):
++        raise subprocess.TimeoutExpired(args[0], kwargs["timeout"])
++
++    monkeypatch.setattr("ocr_core.engines.chandra.subprocess.run", timeout)
++    result = ChandraEngine(timeout=1).process_image(source)
++
++    assert not result.ok
++    assert "timed out" in result.error
++
++
++# --- E26: silent-failure guards (reproduces the defect found by live testing) ---
++
++def test_chandra_empty_markdown_with_zero_exit_is_failure(monkeypatch, tmp_path):
++    """Reproduces the E25 finding: chandra-ocr 0.2.0 exits 0 and writes an
++    empty .md when inference fails (vLLM backend unreachable). The adapter
++    must NOT report this as a successful blank result."""
++    source = tmp_path / "scan.png"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: "/usr/bin/chandra")
++
++    def fake_run(command, **kwargs):
++        return _fake_cli_result(
++            command, md_text="",
++            metadata={"num_pages": 1, "total_token_count": 0},
++        )
++
++    monkeypatch.setattr("ocr_core.engines.chandra.subprocess.run", fake_run)
++    result = ChandraEngine().process_image(source)
++
++    assert not result.ok
++    assert "empty" in (result.error or "").lower()
++    assert result.text == ""
++    assert result.meta["empty_output"] is True
++    assert result.meta["generation_evidence"] == "zero_tokens_recorded"
++
++
++def test_chandra_whitespace_markdown_is_failure(monkeypatch, tmp_path):
++    source = tmp_path / "scan.png"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: "/usr/bin/chandra")
++
++    def fake_run(command, **kwargs):
++        return _fake_cli_result(command, md_text="  \n\t  \n")
++
++    monkeypatch.setattr("ocr_core.engines.chandra.subprocess.run", fake_run)
++    result = ChandraEngine().process_image(source)
++
++    assert not result.ok
++    assert "empty" in (result.error or "").lower()
++
++
++def test_chandra_missing_markdown_is_failure(monkeypatch, tmp_path):
++    source = tmp_path / "scan.png"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: "/usr/bin/chandra")
++
++    def fake_run(command, **kwargs):
++        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
++
++    monkeypatch.setattr("ocr_core.engines.chandra.subprocess.run", fake_run)
++    result = ChandraEngine().process_image(source)
++
++    assert not result.ok
++    assert "unambiguous" in (result.error or "")
++
++
++def test_chandra_metadata_num_pages_is_recorded(monkeypatch, tmp_path):
++    source = tmp_path / "report.pdf"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: "/usr/bin/chandra")
++
++    def fake_run(command, **kwargs):
++        return _fake_cli_result(
++            command, md_text="page one\n\npage two",
++            metadata={"num_pages": 3, "total_token_count": 4213},
++        )
++
++    monkeypatch.setattr("ocr_core.engines.chandra.subprocess.run", fake_run)
++    result = ChandraEngine().process_pdf(source)
++
++    assert result.ok
++    assert result.pages == 3
++    assert result.meta["page_count_status"] == "known_metadata"
++    assert result.meta["metadata_status"] == "parsed"
++
++
++def test_chandra_missing_metadata_is_defensive(monkeypatch, tmp_path):
++    source = tmp_path / "report.pdf"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: "/usr/bin/chandra")
++
++    def fake_run(command, **kwargs):
++        return _fake_cli_result(command, md_text="real text")
++
++    monkeypatch.setattr("ocr_core.engines.chandra.subprocess.run", fake_run)
++    result = ChandraEngine().process_pdf(source)
++
++    assert result.ok
++    assert result.pages == 0
++    assert result.meta["page_count_status"] == "unknown"
++    assert result.meta["metadata_status"] == "missing"
++
++
++def test_chandra_corrupt_metadata_is_defensive(monkeypatch, tmp_path):
++    source = tmp_path / "report.pdf"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: "/usr/bin/chandra")
++
++    def fake_run(command, **kwargs):
++        output_dir = Path(command[2])
++        stem = Path(command[1]).stem
++        result_dir = output_dir / stem
++        result_dir.mkdir(parents=True)
++        (result_dir / f"{stem}.md").write_text("real text", encoding="utf-8")
++        (result_dir / f"{stem}_metadata.json").write_text("{not-json", encoding="utf-8")
++        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
++
++    monkeypatch.setattr("ocr_core.engines.chandra.subprocess.run", fake_run)
++    result = ChandraEngine().process_pdf(source)
++
++    assert result.ok
++    assert result.pages == 0
++    assert result.meta["metadata_status"] == "corrupt"
++
++
++def test_chandra_zero_token_metadata_is_flagged_not_fatal(monkeypatch, tmp_path):
++    """The proven 0.2.0 contract is: failure -> empty md AND zero tokens.
++    The converse (non-empty md with zero recorded tokens) is NOT proven as a
++    failure, so it is surfaced as evidence without rejecting the result."""
++    source = tmp_path / "scan.png"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: "/usr/bin/chandra")
++
++    def fake_run(command, **kwargs):
++        return _fake_cli_result(
++            command, md_text="some text",
++            metadata={"num_pages": 1, "total_token_count": 0},
++        )
++
++    monkeypatch.setattr("ocr_core.engines.chandra.subprocess.run", fake_run)
++    result = ChandraEngine().process_image(source)
++
++    assert result.ok
++    assert result.meta["generation_evidence"] == "zero_tokens_recorded"
++
++
++def test_chandra_nonzero_exit_is_failure(monkeypatch, tmp_path):
++    """Unit-level mirror of the live E25 test: a real hf-backend crash
++    (ModuleNotFoundError: torch) surfaces as an explicit error, never success."""
++    source = tmp_path / "scan.png"
++    source.write_bytes(b"synthetic")
++    monkeypatch.setattr("ocr_core.engines.chandra.shutil.which", lambda _: "/usr/bin/chandra")
++
++    def fake_run(command, **kwargs):
++        return subprocess.CompletedProcess(
++            command, 1, stdout="", stderr="ModuleNotFoundError: No module named 'torch'"
++        )
++
++    monkeypatch.setattr("ocr_core.engines.chandra.subprocess.run", fake_run)
++    result = ChandraEngine().process_image(source)
++
++    assert not result.ok
++    assert "exited with status 1" in (result.error or "")
+diff --git a/tests/test_chandra_integration.py b/tests/test_chandra_integration.py
+new file mode 100644
+index 0000000..fadd099
+--- /dev/null
++++ b/tests/test_chandra_integration.py
+@@ -0,0 +1,94 @@
++"""Integration tests: the REAL chandra-ocr CLI against the adapter.
++
++Unlike tests/test_chandra_engine.py (mocked unit tests), these run the actual
++`chandra` executable (chandra-ocr, base install) and verify the CLI contract
++and failure semantics that mocks cannot prove. They download NO model weights
++and are skipped unless CHANDRA_INTEGRATION=1 is set, so CI stays hermetic.
++
++Local run (with chandra-ocr installed in a venv):
++
++    CHANDRA_INTEGRATION=1 PATH="<venv>/bin:$PATH" \
++        pytest tests/test_chandra_integration.py -v
++
++Verified contract (chandra-ocr==0.2.0, see docs/chandra_ocr.md):
++- `chandra <input> <output> --method [hf|vllm]` positional CLI
++- unreachable vLLM backend: CLI retries, then exits 0 with an EMPTY .md
++  (the silent-failure hole closed by fix 3ed55c1; adapter must reject it)
++- hf backend without torch: non-zero exit, surfaced as an explicit error
++"""
++import os
++import shutil
++import subprocess
++
++import pytest
++
++from ocr_core.engines.chandra import ChandraEngine
++
++pytestmark = pytest.mark.skipif(
++    os.environ.get("CHANDRA_INTEGRATION") != "1",
++    reason="integration tests need the real chandra CLI (CHANDRA_INTEGRATION=1)",
++)
++
++
++def _require_cli() -> str:
++    exe = shutil.which("chandra")
++    if exe is None:
++        pytest.skip("chandra CLI not found on PATH")
++    return exe
++
++
++def _tiny_png(tmp_path):
++    pytest.importorskip("PIL.Image")  # pillow ships with chandra-ocr base
++    from PIL import Image
++
++    png = tmp_path / "scan.png"
++    Image.new("RGB", (120, 60), "white").save(png)
++    return png
++
++
++def test_real_cli_argument_contract():
++    """`chandra --help` must expose the flags the adapter relies on."""
++    exe = _require_cli()
++    out = subprocess.run([exe, "--help"], capture_output=True, text=True, timeout=60)
++    text = out.stdout + out.stderr
++    assert "--method" in text
++    assert "--page-range" in text
++    assert "hf" in text and "vllm" in text
++
++
++def test_real_vllm_without_server_is_explicit_failure(tmp_path):
++    """Reproduces the E25 silent failure with the real CLI, end to end.
++
++    chandra-ocr 0.2.0 retries the unreachable vLLM backend, then exits 0 and
++    writes an EMPTY <stem>.md. Before fix 3ed55c1 the adapter returned
++    ok=True with empty text; it must now report an explicit failure.
++    """
++    exe = _require_cli()
++    png = _tiny_png(tmp_path)
++
++    engine = ChandraEngine(method="vllm", executable=exe, timeout=300)
++    result = engine.process_image(png)
++
++    assert not result.ok
++    assert "empty" in (result.error or "").lower()
++    assert result.meta.get("empty_output") is True
++
++
++def test_real_hf_backend_crash_is_surfaced(tmp_path):
++    """A real hf-backend crash (e.g. torch missing) must never look like
++    success. Skipped when torch IS importable, because then the CLI would
++    attempt genuine model loading instead of crashing."""
++    exe = _require_cli()
++    try:
++        import torch  # noqa: F401
++    except ImportError:
++        pass
++    else:
++        pytest.skip("torch importable; hf path would attempt real inference")
++
++    png = _tiny_png(tmp_path)
++    engine = ChandraEngine(method="hf", executable=exe, timeout=300)
++    result = engine.process_image(png)
++
++    assert not result.ok
++    assert "exited with status" in (result.error or "")

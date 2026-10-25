@@ -1,0 +1,87 @@
+{
+  "artifact": "e26_postfix_report",
+  "status": "RECONSTRUCTED_MANIFEST — NOT A FRESH EXECUTION LOG",
+  "provenance_note": "The original E26 execution report was generated live on 2026-10-23 and lost with the 2026-10-25 verification-environment reset (the workspace is wiped between sessions). This file is a manifest that re-documents the published numbers with their sources. It deliberately does NOT claim to be a new execution. The numbers below were re-proven live on 2026-10-23 by the independent review whose full text is preserved verbatim in e26_review_comment.md, and remain re-runnable via evidence/pr66/scripts/e26_chandra_postfix_recheck.py.",
+  "review_comment": {
+    "id": 6368829627,
+    "created_at": "2026-10-23T15:47:03Z",
+    "url": "https://github.com/DrAbdulmalek/ocr-core/pull/66#issuecomment-6368829627",
+    "verbatim_copy_in_bundle": "evidence/pr66/reports/e26_review_comment.md"
+  },
+  "commits": {
+    "pr_head_at_review": "da0c831bedeec91018064ea8e12f4967f74f6e01",
+    "review_addition": {
+      "sha": "da0c831",
+      "subject": "test(ocr): add gated real-CLI Chandra integration tests",
+      "file": "tests/test_chandra_integration.py",
+      "still_on_branch": true,
+      "verified_via": "GitHub contents API 2026-10-25 (blob sha fadd0998ddb83ab9b7f6d8ecc50e6664f44b8dd6, 3241 bytes)"
+    },
+    "fix_under_review": ["3ed55c1 fix(ocr): treat empty Chandra Markdown output as failed inference", "41b35a7 docs(ocr): document Chandra empty-output guard and metadata page counts"],
+    "prefix_commit": "8b601e8",
+    "main_sha": "0466788028d5b9034dad640efda944e7289e86d9"
+  },
+  "verified_numbers_published_2026_10_23": [
+    {
+      "item": "Adapter unit tests on 41b35a7",
+      "published": "14/14 passed",
+      "source": "review comment table row 1"
+    },
+    {
+      "item": "Full package suite on 41b35a7 (Py3.12, pytest 9.0.2)",
+      "published": "518 passed / 7 skipped",
+      "source": "review comment table row 2"
+    },
+    {
+      "item": "Pre-fix defect reproduction on 8b601e8 via isolated worktree",
+      "published": "6 failed / 8 passed",
+      "source": "review comment table row 3"
+    },
+    {
+      "item": "Live integration vs chandra-ocr==0.2.0, vllm path with no server",
+      "published": "ok=false, error 'empty Markdown output…', empty_output=true, generation_evidence=zero_tokens_recorded, returncode=0 (CLI retried then wrote a 0-byte md)",
+      "source": "review comment table row 4"
+    },
+    {
+      "item": "Live integration, hf path without torch",
+      "published": "ok=false with the CLI crash surfaced explicitly (exited with status 1)",
+      "source": "review comment table row 5"
+    },
+    {
+      "item": "CI on 41b35a7 and on new head da0c831",
+      "published": "3/3 success on both",
+      "source": "review comment table row 6; re-checked via GitHub check-runs API 2026-10-25: test=success, ui-import=success, Scan PR diff for credential-like material=success"
+    },
+    {
+      "item": "Branch integrity",
+      "published": "origin/main=0466788 unchanged, PR OPEN/DRAFT, mergeable_state clean",
+      "source": "review comment table row 7; re-checked via API 2026-10-25 (head da0c831, base 0466788, draft=true)"
+    },
+    {
+      "item": "Gated integration tests added by the review",
+      "published": "3 passed in 55.07s live (CHANDRA_INTEGRATION=1), skipped in CI; full suite after addition: 518 passed / 10 skipped",
+      "source": "review comment section 2"
+    }
+  ],
+  "remaining_gates_before_any_merge": [
+    "Real-model inference with the ~10.6 GB weights on a capable machine/server (not the 16 GB no-GPU workstation)",
+    "Arabic medical golden set with CER/WER and IoU",
+    "vLLM path against a controlled live server",
+    "Modified OpenRAIL-M weights license review before any commercial/clinical use"
+  ],
+  "bundle_files": {
+    "recovered_verbatim_from_github": [
+      "reports/e26_review_comment.md",
+      "reports/pr66.diff",
+      "reports/pr66_meta.json"
+    ],
+    "reconstructed_functionally": [
+      "scripts/e25_chandra_real_cli_smoke.py",
+      "scripts/e26_chandra_postfix_recheck.py",
+      "this manifest"
+    ],
+    "already_on_github_branch": [
+      "tests/test_chandra_integration.py (commit da0c831, untouched)"
+    ]
+  }
+}
