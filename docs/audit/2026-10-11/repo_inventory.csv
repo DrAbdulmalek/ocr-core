@@ -1,0 +1,56 @@
+name,visibility,archived,fork,default_branch,pushed_at,open_issues_incl_prs,size_kb,language,license,description
+DrAbdulmalek,public,False,False,main,2026-10-07T09:18:16Z,0,6,,,GitHub Profile README
+OmniFile_Processor,public,False,False,main,2026-08-01T22:03:10Z,0,704,Python,NOASSERTION,"Arabic-optimized OCR & document processing suite — multi-engine ensemble, RTL support, medical document pipeline"
+arabic-medical-glossary,public,False,False,main,2026-10-06T12:29:00Z,0,5042,Python,MIT,Arabic-English Medical Glossaries & Terminologies — bilingual phrase lists and term bases extracted from pharmaceutical 
+arabic-medical-handwriting,public,False,False,main,2026-10-11T15:23:33Z,1,33,Python,MIT,"Clean-room Arabic medical handwriting OCR — unified OCRResult contract + multi-engine (TrOCR/Tesseract/EasyOCR), built a"
+arabic-medical-ocr-baseline,public,True,False,main,2026-07-07T14:07:50Z,0,13,Python,,Reference Model Card — Multi-engine OCR ensemble architecture for Arabic medical handwriting (PaddleOCR + Tesseract + Ea
+channel-ops-dashboard,private,False,False,main,2026-10-07T09:52:53Z,2,363,TypeScript,,لوحة عمليات قناة تيليجرام الطبية: مشغّل محركات مدقّق + حلقة OCR كاملة متصلة بـ omni-medical-suite
+dictionaries-csv,public,False,False,main,2026-10-08T00:12:14Z,0,58822,Python,NOASSERTION,"Bilingual (EN-AR) dictionary collection converted to CSV. 14 dictionaries (466,670 entries) from MDX, StarDict, HTML, PD"
+finereader-ocr-apk-analysis,public,False,False,main,2026-10-05T06:35:43Z,1,60,Shell,,تحليل هندسي عكسي ساكن لمحرك OCR (عربي/إنجليزي) في ABBYY FineReader Pro لأندرويد v15.2.0.7 — توثيق أصلي بلا أي ملفات ثنائ
+gdrive-telegram-tools,private,False,False,main,2026-10-07T18:01:27Z,2,12509,Python,,"Google Drive to Telegram books migration toolkit (crawler, manifest, MTProto uploader)"
+glossary-api,public,False,False,main,2026-10-06T12:22:38Z,0,52,Python,MIT,REST API for Arabic Medical Glossary - Calibre-inspired management system
+glossary-collector,private,False,False,main,2026-08-01T22:01:34Z,0,64,Python,,Auto-collects Arabic medical glossaries from Telegram channels → GitHub + HF Dataset
+handwriting-notes,private,False,False,main,2026-10-06T10:13:37Z,0,1184644,Python,,"Private training source: handwriting notes image enhancement, deskew, margin trim, word snippets (قصاصات) + training dat"
+intelli-file-manager,public,False,False,main,2026-10-11T21:41:50Z,11,18263,Python,MIT,IntelliFile — Intelligent File Management App
+malek_data,private,True,False,main,2026-09-05T12:12:22Z,2,314616,,,بيانات متفرقة بحاجة لاستخراج المفيد منها ودمجها في مكانها المناسب وتتضمن قواميس ومسارد ترجمة وكودات متفرقة لمشاريع سابقة
+manjaro-care,public,False,False,main,2026-10-10T21:51:33Z,2,465,Python,MIT,Manjaro system care toolkit - restored from omni-medical-suite history
+manjaro-doctor,public,False,False,main,2026-08-13T13:59:08Z,0,14,Shell,MIT,🩺 مرجع عملي مفتوح المصدر لمشاكل Manjaro Linux الحقيقية وحلولها — كل مشكلة موثّقة هنا حدثت فعلياً مع التشخيص الكامل والحل
+marathon-suite,public,False,False,main,2026-10-08T11:15:28Z,7,515,Python,MIT,"Thin coordinator for the marathon suite — pins ocr-core + translation-core, owns the bridge contract. Not a monorepo. MI"
+marathon_ted_pipeline,public,False,False,main,2026-10-11T20:59:25Z,18,597,Python,,منصة استخراج وترجمة ونشر المحتوى — TED/PDF/EPUB/ASR — OCR بـ18 قاعدة، 4 محركات ترجمة، 10 لغات، تيليجرام، مراقبة، K8s
+medical-handwriting-ocr,public,True,False,main,2026-07-07T14:07:45Z,5,738,Python,MIT,Flagship Demo — Medical Handwriting OCR powered by Omni Medical Suite
+medical-ocr-archived,private,True,False,main,2026-10-03T23:52:02Z,0,10630,Python,,Archived code from consolidated medical-ocr repositories
+medical-ocr-benchmarks,public,True,False,main,2026-07-07T14:08:17Z,0,188,Python,MIT,Quality Gate — CER/WER/medical-term accuracy with nightly regression checks
+medical-ocr-demo,public,False,False,main,2026-08-02T22:32:48Z,0,35,Python,MIT,🏥 Omni Medical OCR — Arabic Medical Text Extraction | HF Space
+medical-ocr-ground-truth,public,True,False,main,2026-07-07T14:08:06Z,9,132,Python,,"Single Source of Truth — Verified Arabic medical OCR reference datasets, auto-dictionary generation, snippet trainer, fo"
+medical-ocr-trainer,public,True,False,main,2026-07-07T14:08:12Z,4,261,Python,MIT,"Human-in-the-Loop Data Collection — 5 OCR engines, confidence-based triage"
+medical-ocr-trainer-hf,public,False,False,main,2026-10-04T00:01:11Z,0,157,Python,MIT,🚀 Medical OCR Trainer — Hugging Face Space Deployment | Deployment-Only Repo
+medical-ocr-training-hub,public,True,False,main,2026-07-07T14:07:56Z,3,90,Python,MIT,"Continuous Improvement Loop — ingest, validate, deduplicate, and feed ground truth"
+medical-rag-ar,public,False,False,main,2026-10-08T00:01:47Z,0,14,Python,MIT,"Arabic Medical RAG — retrieval-augmented medical Q&A over Arabic documents, built on ocr-core + arabic-medical-glossary."
+medical-translation-bot,private,False,False,main,2026-10-04T00:11:26Z,1,171,Python,MIT,"Telegram bot that accepts books, processes them through the medical-translation pipeline, and pushes results to the know"
+medical-translation-intake,private,False,False,main,2026-10-08T06:26:34Z,1,12248,Python,MIT,"Medical translation pipeline — accepts public-domain medical books, extracts EN↔AR vocabulary, parallel sentences, and t"
+medical-translation-knowledge,private,True,False,main,2026-10-03T23:52:02Z,0,16,,,"Medical translation pipeline — accepts public-domain medical books, extracts EN↔AR vocabulary, parallel sentences, and t"
+ocr-core,public,False,False,main,2026-10-11T21:53:46Z,9,3408,Python,MIT,Shared OCR engine — Visual Evidence Charter (18 rules) + Arabic medical corrections
+omni-handwriting-samples-private,private,False,False,main,2026-09-23T13:44:31Z,0,12450,Python,,Personal Arabic medical handwriting corpus (S-series) for HTR development — PRIVATE by owner decision. Scans never go to
+omni-llm-provider-layer,private,False,False,main,2026-10-10T23:43:23Z,0,18,,,"Local-first, provider-neutral LLM integration layer for the Omni medical OCR and translation ecosystem, with explicit cl"
+omni-medical-dictionaries,public,False,False,main,2026-10-05T17:29:15Z,1,1015081,Python,MIT,Scanner Fixer v2.1 + Arabic-English Dictionary Collection
+omni-medical-suite,public,False,False,main,2026-10-11T15:28:29Z,48,1325561,Python,MIT,Unified Medical OCR Platform — Next.js + FastAPI + Gradio + Qdrant + Redis
+omni-medical-suite_dict,private,False,False,main,2026-10-04T00:01:42Z,1,140959,Python,NOASSERTION,
+omni-medical-workspace,private,True,False,main,2026-10-03T23:41:11Z,0,335515,Python,,"Persistent Z.ai workspace — recovery repository for checkpoints, audits, evidence, and session state."
+omni-ocr-training-db,private,False,False,main,2026-10-05T15:51:08Z,0,22,,,"Training database for Omni OCR: annotated slices (قصاصات), glyph patterns (أنماط), and manifests collected via HITL OCR "
+ortho-books-sync,private,False,False,main,2026-10-08T00:01:45Z,0,68,Python,MIT,"Telegram books/files sync — multi-source (channels/web/APK) → target channel, SHA-256 dedup, DMCA legal filter, APSchedu"
+radiology-ai-platform,public,False,False,main,2026-08-01T22:01:22Z,1,136,Python,Apache-2.0,Radiology AI Platform — منصة ذكاء اصطناعي لتوليد التقارير الإشعاعية باللغة العربية من صور DICOM. Planning phase.
+rea-integration-lab,private,False,False,main,2026-10-10T23:42:33Z,0,8,,MIT,"Integration lab for Reverse Engineer Anything (REA) — audit, MCP adapters, and safe local analysis workflows. Upstream: "
+repo-sync-toolkit,public,False,False,main,2026-10-11T15:12:38Z,1,276,Python,MIT,"Secure Git Synchronization — 28 repos + 11 HF Spaces, token manager, TUI dashboard"
+reset-net,public,False,False,main,2026-09-01T21:30:25Z,1,51,Shell,MIT,Network reset utility - restored from omni-medical-suite history
+scanner-fixer,public,True,False,main,2026-07-07T14:08:01Z,5,15046,Python,MIT,"Pre-OCR Image Normalization — perspective correction, deskew, denoise for medical scans"
+sync-github,public,True,False,main,2026-10-03T23:52:02Z,2,25,Shell,MIT,One-command sync for all local GitHub repos
+telegram-tools,public,False,False,main,2026-10-07T09:17:16Z,9,355,Python,MIT,"Unified Telegram toolkit: copy, forward, extract, preprocess, and align bilingual medical corpora for ML training. Monor"
+tg-campaign-toolkit,private,False,False,main,2026-10-11T21:57:30Z,7,18510,Python,,Telegram book-campaign toolkit: multi-source forwarder + link-harvest pipeline (scan/download/send) with crash-safe stat
+tmx-corpus,private,False,False,main,2026-10-10T23:21:56Z,1,51,Python,,TMX corpus + marathon state: GitHub permanent layer <-> Google Drive cold storage bridge
+translation-book-intake,private,True,False,main,2026-10-03T23:52:02Z,0,34,Python,,"Pipeline that accepts translation-related books (PDF/EPUB/DOCX/TXT/MOBI/AZW3), extracts EN↔AR vocabulary, parallel sente"
+translation-core,public,False,False,main,2026-10-04T23:21:11Z,1,73,Python,MIT,"Shared translation engine — language registry, engines, quality metrics, TM/TMX, glossary. MIT."
+translation-knowledge-base,private,False,False,main,2026-10-10T20:44:57Z,1,25715,,MIT,"Structured knowledge base receiving artifacts (terms, sentences, translation rules) from the translation-book-intake pip"
+translearners-archive,private,True,False,main,2026-09-24T19:18:46Z,0,7980,,,Archive of Translearners Telegram group (texts + files inventory) for later NLP vocabulary/algorithm extraction — PRIVAT
+workspace-scripts-archive,public,True,False,main,2026-09-25T18:55:50Z,0,390,Python,,"Full snapshot of workspace scripts (dependency-audit forensics, probes) + redacted operational worklog. Active TG toolin"
+zai-sessions,private,False,False,session-4dc2e64b,2026-10-06T06:07:01Z,0,39239,Python,,Z.ai session persistence snapshots (zai-persist.sh v1.1)
+zai-workspace,private,False,False,main,2026-10-05T18:29:15Z,0,83199,Python,,أرشيف جلسات Z.ai — كل خطوة وكل ملف تحت مجلد باسم الجلسة
