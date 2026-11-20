@@ -67,7 +67,7 @@ _DEFAULT_CORRECT = ["✓", "✔", "☑"]
 _DEFAULT_RULES_FILE = (
     Path(__file__).resolve().parent.parent / "config" / "marathon_ocr_rules.yaml"
 )
-_DEFAULT_INCORRECT = ["✗", "✘", "X", "x", "✖", "❌"]
+_DEFAULT_INCORRECT = ["✗", "✘", "✖", "❌"]
 _DEFAULT_UNCERTAINTY = {
     "visual_confidence_low": "VISUAL_CONFIDENCE_LOW",
     "visual_interpretation": "VISUAL_INTERPRETATION_UNCERTAIN",
@@ -185,39 +185,36 @@ class OCRProcessor:
         vm = self.config.get("visual_markers") or {}
         correct = list(vm.get("correct") or _DEFAULT_CORRECT)
         incorrect = list(vm.get("incorrect") or _DEFAULT_INCORRECT)
-        # ضمان أن ✗ ✘ X موجودة دائمًا (متطلب صريح من المبدأ 6)
-        for m in ("✗", "✘", "X"):
-            if m not in incorrect:
-                incorrect.append(m)
+        ambiguous = list(vm.get("ambiguous") or ["X", "x"])
+        # Ambiguous symbols must never be promoted to incorrect by default.
+        incorrect = [item for item in incorrect if item not in ambiguous]
+        for marker in ("✗", "✘"):
+            if marker not in incorrect:
+                incorrect.append(marker)
 
         uf = self.config.get("uncertainty_flags") or _DEFAULT_UNCERTAINTY
         for k, v in _DEFAULT_UNCERTAINTY.items():
             uf.setdefault(k, v)
-
         fv = self.config.get("final_verification") or {}
         checks = list(fv.get("checklist") or _DEFAULT_CHECKS)
-        verdicts = list(fv.get("verdicts")
-                        or ["PASS", "PARTIAL", "UNCERTAIN", "FAILED"])
-
+        verdicts = list(fv.get("verdicts") or ["PASS", "PARTIAL", "UNCERTAIN", "FAILED"])
         color = dict(self.config.get("color_semantics") or {})
         color.setdefault("require_legend", True)
         color.setdefault("legend_keywords", _DEFAULT_LEGEND_KEYWORDS)
         color.setdefault("on_missing_legend", "COLOR_SEMANTICS_UNCERTAIN")
-
         ctx = (vm.get("context_keywords") or {}) or dict(_DEFAULT_CONTEXT)
 
         self.visual_markers_cfg = {
             "correct": correct,
             "incorrect": incorrect,
+            "ambiguous": ambiguous,
             "caution": vm.get("caution", ""),
         }
+        self.ambiguous_markers_cfg = set(ambiguous)
         self.uncertainty_labels = uf
         self.classification_labels = self.config.get("classification_labels") or {}
         self.color_semantics = color
-        self.verification = {
-            "required_checks": checks,
-            "final_status_options": verdicts,
-        }
+        self.verification = {"required_checks": checks, "final_status_options": verdicts}
         self.training_data_rules = self.config.get("training_data_rules") or {}
         self.context_keywords = ctx
 
@@ -229,10 +226,13 @@ class OCRProcessor:
             vm = self.visual_markers_cfg
             vm["correct"] = [m for m in r14 if m in ("✓", "✔", "☑", "✅")] or vm["correct"]
             vm["incorrect"] = (
-                [m for m in r14 if m in ("✖", "✗", "✘", "❌", "X", "x")]
+                [m for m in r14 if m in ("✖", "✗", "✘", "❌")]
                 or vm["incorrect"]
             )
-            for m in ("✗", "✘", "X"):
+            vm["incorrect"] = [m for m in vm["incorrect"] if m not in {"X", "x"}]
+            vm["ambiguous"] = ["X", "x"]
+            self.ambiguous_markers_cfg = {"X", "x"}
+            for m in ("✗", "✘"):
                 if m not in vm["incorrect"]:
                     vm["incorrect"].append(m)
 
@@ -440,6 +440,26 @@ class OCRProcessor:
             return word
         return re.sub(r"\S+", _flag, text)
 
+
+    # نطاق الدليل داخل السطر (المبدأ 9): علامة واحدة لا تُثبت إلا المقطع
+    # الذي تلتصق به فعليًا. يُستخدم في R16.
+    # Do not split decimal medical values such as 1.5 mg or ٣٫٥ (ASCII decimal point).
+    # A dot is a segment boundary only when it is not between digits.
+    _SEGMENT_SPLIT_RE = re.compile(r"(?<![0-9٠-٩۰-۹])[.!?\u061f\u061b\u2026]+(?![0-9٠-٩۰-۹])")
+    _MARKER_ONLY_RE = re.compile(r"^[\s\W_]+$", re.UNICODE)
+
+    def _evidence_scope_is_line_unambiguous(self, line: str) -> bool:
+        """هل يمكن نَسب العلامة في هذا السطر إلى مقطع إجابة واحد؟
+
+        السطر «قابل للنَسب» فقط إذا احتوى على مقطع نصي جوهري واحد بالضبط
+        (يحمل حروفًا/أرقامًا). سطر رموز فقط لا يُنسب إلى أي إجابة، وسطر يضم
+        عدة إجابات معًا (مخرَج OCR بلا حدود أسطر) لا يحمل دليلًا موضعيًا لأي
+        منها بمفردها — كلاهما يبقى uncertain حمايةً لبيانات التدريب.
+        """
+        segments = [s.strip() for s in self._SEGMENT_SPLIT_RE.split(line) if s.strip()]
+        substantive = [s for s in segments if not self._MARKER_ONLY_RE.match(s)]
+        return len(substantive) == 1
+
     def r16_separate_correct_vs_wrong(self, text: str) -> dict:
         """R16: فصل المخرجات الصحيحة عن الخاطئة (حماية بيانات التدريب)."""
         if "R16" in self.rules and self.rules["R16"].get("enabled", False):
@@ -449,15 +469,81 @@ class OCRProcessor:
         threshold = params.get("correct_ratio_threshold", 0.85)
         words = text.split()
         if not words:
-            return {"correct": "", "wrong": text, "ratio": 0.0}
+            return {
+                "correct": "", "wrong": "", "uncertain": text,
+                "ratio": 0.0, "classification": "uncertain",
+                "evidence_markers": [],
+            }
         # كلمة "سليمة" = حروف عربية/لاتينية/أرقام/ترقيم قياسي فقط
         ok_re = re.compile(r"^[\u0621-\u064aa-zA-Z0-9.,;:!?()\[\]\"'«»،؛؟-]+$")
         good = sum(1 for w in words if ok_re.match(w))
         ratio = good / len(words)
+        require_evidence = params.get("require_visual_evidence", self.version >= 2)
+        if require_evidence:
+            # نطاق الدليل (إصلاح ملاحظة مراجعة PR #57): الدليل يُشتق من النص
+            # المُمرَّر نفسه سطرًا بسطر، لا من self.stats.markers_found
+            # المتراكمة عبر النصوص — علامة واحدة لا تُصادق على مستند كامل،
+            # وأدلة نص سابق لا تتسرب إلى نص لاحق.
+            correct_set = self._correct_set
+            incorrect_set = self._incorrect_set
+            evidence_in_text: list = []
+            correct_lines: list = []
+            wrong_lines: list = []
+            uncertain_lines: list = []
+            for ln in text.splitlines() or [text]:
+                line_correct = [m for m in correct_set if m in ln]
+                line_incorrect = [m for m in incorrect_set if m in ln]
+                evidence_in_text.extend(line_correct)
+                evidence_in_text.extend(line_incorrect)
+                if line_correct and line_incorrect:
+                    # دليلان متضاربان في السطر نفسه → السطر غير محسوم
+                    uncertain_lines.append(ln)
+                elif line_correct or line_incorrect:
+                    # نطاق الدليل (المبدأ 9): العلامة تُثبت المقطع الذي تلتصق به
+                    # فقط. سطر بلا مقطع نصي واحد، أو سطر يضم عدة مقاطع إجابات،
+                    # لا يسمح بنَسب الدليل → يبقى غير محسوم.
+                    if self._evidence_scope_is_line_unambiguous(ln):
+                        if line_correct:
+                            correct_lines.append(ln)
+                        else:
+                            wrong_lines.append(ln)
+                    else:
+                        uncertain_lines.append(ln)
+                else:
+                    uncertain_lines.append(ln)
+            evidence_in_text = sorted(set(evidence_in_text))
+            if not correct_lines and not wrong_lines:
+                # لا دليل مُقيِّد في النص → يبقى غير محسوم بالكامل (سلوك محافظ)
+                return {
+                    "correct": "", "wrong": "", "uncertain": text,
+                    "ratio": round(ratio, 4), "classification": "uncertain",
+                    "evidence_markers": evidence_in_text,
+                }
+            # تصنيف المستند الكامل محافظ: correct فقط إذا كان كل سطر مؤكدًا
+            # صحيحًا، وincorrect فقط إذا كان كل سطر مؤكدًا خاطئًا، وإلا uncertain.
+            if correct_lines and not wrong_lines and not uncertain_lines:
+                classification = "correct"
+            elif wrong_lines and not correct_lines and not uncertain_lines:
+                classification = "incorrect"
+            else:
+                classification = "uncertain"
+            return {
+                "correct": "\n".join(correct_lines),
+                "wrong": "\n".join(wrong_lines),
+                "uncertain": "\n".join(uncertain_lines),
+                "ratio": round(ratio, 4),
+                "classification": classification,
+                "evidence_markers": evidence_in_text,
+            }
+        # Explicit v1 compatibility mode only; the ratio is not semantic evidence.
+        is_clean = ratio >= threshold
         return {
-            "correct": text if ratio >= threshold else "",
-            "wrong": "" if ratio >= threshold else text,
+            "correct": text if is_clean else "",
+            "wrong": "" if is_clean else text,
+            "uncertain": "",
             "ratio": round(ratio, 4),
+            "classification": "correct" if is_clean else "incorrect",
+            "evidence_markers": list(self.stats.markers_found),
         }
 
     def r17_detect_lists_and_headings(self, text: str) -> str:
@@ -509,6 +595,7 @@ class OCRProcessor:
     ) -> dict:
         """تنفيذ القواعد الـ 18 بالترتيب وإرجاع النص النظيف + البيانات الوصفية."""
         self.stats = OCRStats()
+        text_verbatim = raw_text
         text = raw_text
 
         # R01-R03: تنظيف أساسي
@@ -556,6 +643,11 @@ class OCRProcessor:
 
         if footnotes:
             text = text + "\n\n---\n\n## الحواشي\n\n" + footnotes
+        # تجديد bucket غير المحسوم فقط عندما يكون فارغًا (بعد ربط النطاق
+        # في R16 قد يحتوي بالفعل الأسطر غير المؤكدة؛ تجربة النص كاملًا هنا
+        # ستكرر الأسطر المؤكدة بالدليل في bucket غير المحسوم).
+        if sep["classification"] == "uncertain" and not sep["uncertain"]:
+            sep["uncertain"] = text
 
         metadata = {
             "rules_file": self.rules_file,
@@ -565,42 +657,58 @@ class OCRProcessor:
             "footnotes_count": self.stats.footnotes,
             "page_numbers_removed": self.stats.pages_dropped,
             "word_ratio": sep["ratio"],
-            "classification": "correct" if sep["correct"] else "wrong",
+            "classification": sep["classification"],
             "had_diacritics": getattr(self.stats, "diacritics_seen", False),
             "had_arabic_digits": getattr(self.stats, "original_digits", False),
         }
 
         return {
             "markdown": text,
+            "text_verbatim": text_verbatim,
+            "text_normalized": text,
             "correct": sep["correct"],
             "wrong": sep["wrong"],
+            "uncertain": sep["uncertain"],
+            "classification": sep["classification"],
             "ratio": sep["ratio"],
             "metadata": metadata,
         }
 
     def save_outputs(self, result: dict, out_dir: Path, stem: str) -> dict:
-        """كتابة المخرجات: الصحيح والخاطئ في ملفين منفصلين + بيانات تعريف."""
+        """Write separate correct, incorrect, uncertain, verbatim, and metadata outputs."""
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         out_cfg = self.settings.get("output", {})
 
         md_path = None
-        if result["correct"]:
+        if result.get("correct"):
             md_path = out_dir / f"{stem}{out_cfg.get('correct_suffix', '')}.md"
             md_path.write_text(result["correct"], encoding="utf-8")
         wrong_path = None
-        if result["wrong"]:
-            wrong_path = (
-                out_dir / f"{stem}{out_cfg.get('wrong_suffix', '.wrong')}.md"
-            )
+        if result.get("wrong"):
+            wrong_path = out_dir / f"{stem}{out_cfg.get('wrong_suffix', '.wrong')}.md"
             wrong_path.write_text(result["wrong"], encoding="utf-8")
+        uncertain_path = None
+        if result.get("uncertain"):
+            uncertain_path = out_dir / f"{stem}{out_cfg.get('uncertain_suffix', '.uncertain')}.md"
+            uncertain_path.write_text(result["uncertain"], encoding="utf-8")
+        verbatim_path = None
+        if "text_verbatim" in result:
+            verbatim_path = out_dir / f"{stem}{out_cfg.get('verbatim_suffix', '.verbatim')}.txt"
+            verbatim_path.write_text(result["text_verbatim"], encoding="utf-8")
 
         meta_path = out_dir / f"{stem}{out_cfg.get('metadata_suffix', '.meta.json')}"
         meta_path.write_text(
             json.dumps(result["metadata"], ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        return {"markdown": md_path, "wrong": wrong_path, "metadata": meta_path}
+        return {
+            "markdown": md_path,
+            "wrong": wrong_path,
+            "uncertain": uncertain_path,
+            "verbatim": verbatim_path,
+            "metadata": meta_path,
+        }
 
     # ============================================================
     #                      طبقة الدليل البصري (v2)
@@ -626,19 +734,21 @@ class OCRProcessor:
         text: str,
         markers: dict[str, Any],
     ) -> dict[str, Any]:
-        """
-        markers = {"detected": ["✓", "✗", ...]}
-        يُرجع: status, correct_markers, incorrect_markers, label, x_warning
-        المبدأ 6: X تتطلب فحص سياق — يُعلَم بـ x_warning لا يُكتم.
-        """
+        """Classify only unambiguous markers; X/x remain uncertain without context."""
         detected = markers.get("detected") or []
         found_correct = [m for m in detected if m in self._correct_set]
         found_incorrect = [m for m in detected if m in self._incorrect_set]
+        found_ambiguous = [
+            m for m in detected
+            if m in getattr(self, "ambiguous_markers_cfg", {"X", "x"})
+        ]
 
         status = "neutral"
         label: str | None = None
-
-        if found_correct and not found_incorrect:
+        if found_ambiguous:
+            status = "uncertain"
+            label = self.uncertainty_labels["visual_interpretation"]
+        elif found_correct and not found_incorrect:
             status = "correct"
         elif found_incorrect and not found_correct:
             status = "incorrect"
@@ -646,15 +756,15 @@ class OCRProcessor:
             status = "uncertain"
             label = self.uncertainty_labels["visual_interpretation"]
 
-        # تحذير X (المبدأ 6): قد تكون رمزًا لا علامة تصحيح
         x_warning = None
-        if "X" in found_incorrect:
+        if any(m in {"X", "x"} for m in detected):
             x_warning = "X_REQUIRES_CONTEXT_CHECK"
 
         return {
             "status": status,
             "correct_markers": found_correct,
             "incorrect_markers": found_incorrect,
+            "ambiguous_markers": found_ambiguous,
             "label": label,
             "x_warning": x_warning,
         }
@@ -831,30 +941,52 @@ class OCRProcessor:
         incorrect: str,
         evidence: dict[str, Any],
     ) -> dict[str, Any]:
-        """
-        القاعدة 15: الترجمة الخاطئة لا تدخل كـ target أبدًا.
-        يدعم المفاتيح القديمة (marker/color) والجديدة
-        (visual_marker/color_status).
-        """
+        """Keep candidates separate; promote a label only with explicit, traceable evidence."""
         marker = evidence.get("visual_marker") or evidence.get("marker")
         color = evidence.get("color_status") or evidence.get("color")
         confidence = evidence.get("confidence", "low")
+        label = evidence.get("label")
+        source_reference = evidence.get("source_reference") or evidence.get("source_file")
+        legend_found = evidence.get("legend_found") is True
+        explicitly_confirmed = evidence.get("evidence_confirmed") is True
 
-        status = "verified" if confidence == "high" else "uncertain"
+        marker_is_correct = marker in set(self.visual_markers_cfg.get("correct", []))
+        marker_is_incorrect = marker in set(self.visual_markers_cfg.get("incorrect", []))
+        color_is_correct = color == "green" and legend_found
+        color_is_incorrect = color == "red" and legend_found
+        label_has_evidence = (
+            (label == "positive_example" and (marker_is_correct or color_is_correct))
+            or (label == "negative_example" and (marker_is_incorrect or color_is_incorrect))
+        )
+        verified = bool(
+            confidence == "high"
+            and explicitly_confirmed
+            and source_reference
+            and label_has_evidence
+        )
+        positive = correct if verified and label == "positive_example" else None
+        negative = incorrect if verified and label == "negative_example" else None
 
         return {
             "source": source,
-            "positive_example": correct or None,
-            "negative_example": incorrect or None,
+            "positive_example": positive,
+            "negative_example": negative,
+            "candidate_positive_example": correct or None,
+            "candidate_negative_example": incorrect or None,
             "evidence": {
                 "marker": marker or "none",
                 "color": color or "uncertain",
+                "legend_found": legend_found,
+                "label": label or "uncertain",
+                "source_reference": source_reference or None,
+                "evidence_confirmed": explicitly_confirmed,
                 "confidence": confidence,
             },
-            "status": status,
-            # حقول قديمة للتوافق
-            "correct_translation": correct or None,
-            "incorrect_translation": incorrect or None,
+            "status": "verified" if verified else "uncertain",
+            "training_eligible": bool(verified and positive),
+            # Legacy fields are gated too; unverified suggestions remain candidates above.
+            "correct_translation": positive,
+            "incorrect_translation": negative,
         }
 
     # ---------- التحقق النهائي (المبدأ 17) ----------

@@ -1,19 +1,33 @@
-# OCR Core Charter v2 - الميثاق التشغيلي
-# تمت مزامنته مع المصدر الرسمي في marathon_ted_pipeline
-# المرجع: https://github.com/DrAbdulmalek/marathon_ted_pipeline/blob/main/config/marathon_ocr_rules.yaml
-reference_sha: "08a7eb37c32a1b01e09f591e1e7486f0e9a920da"
+# OCR Core Charter v2 — compact compatibility manifest
+# Runtime source of truth: src/ocr_core/config/marathon_ocr_rules.yaml
+# This file is a policy summary, not a second operational ruleset.
 version: "2.0"
+name: "ocr_core_visual_evidence_charter"
+runtime_config: "src/ocr_core/config/marathon_ocr_rules.yaml"
 
 rules:
   - id: ARABIC_MEDICAL_SANCTITY
-    description: "الأرقام الطبية والوحدات مقدسة، يمنع تصحيحها تلقائياً بواسطة LLM (Visual Evidence Charter)"
+    description: "الأرقام الطبية والوحدات لا تُصحح تلقائياً بواسطة LLM."
     action: "guardrail"
   - id: ENGINE_VOTING
-    description: "استخدام Tesseract + PaddleOCR + EasyOCR مع اختيار أعلى ثقة"
+    description: "تُسجل نتائج محركات OCR ومصادر الثقة؛ لا تُختزل الثقة إلى أعلى رقم دون معايرة."
     action: "ensemble"
   - id: NO_DESTRUCTIVE_NORMALIZATION
-    description: "يمنع تحويل (ة) إلى (هـ) أو (ى) إلى (ي) في النص النهائي المصحح"
+    description: "النص الأصلي محفوظ؛ التطبيع ينتج نسخة منفصلة ولا يستبدله."
     action: "strict"
   - id: VISUAL_EVIDENCE_REQUIRED
-    description: "نص OCR نظيف ليس دليلاً على صحته. الصحة تُستنتج من دليل بصري، وإلا فالنتيجة uncertain"
+    description: "النص النظيف أو نسبة سلامة المحارف ليست دليلاً على صحة المعنى."
     action: "guardrail"
+    require_visual_evidence: true
+    default_without_evidence: "uncertain"
+  - id: AMBIGUOUS_MARKERS_REQUIRE_CONTEXT
+    description: "X/x ليست علامة خطأ تلقائية؛ تحتاج إلى سياق أو مفتاح موثق."
+    action: "guardrail"
+    ambiguous_markers: ["X", "x"]
+  - id: VERBATIM_AND_NORMALIZED_SEPARATE
+    description: "احفظ text_verbatim وtext_normalized منفصلين مع إمكانية تتبع المصدر."
+    action: "data_integrity"
+  - id: TRAINING_REQUIRES_EXPLICIT_CONFIRMATION
+    description: "لا تُرقّى القصاصة إلى بيانات تدريب إلا بتأكيد صريح، ودليل قابل للتتبع، ومراجعة بشرية."
+    action: "training_gate"
+    required_fields: ["evidence_confirmed", "source_reference", "label", "confidence"]
