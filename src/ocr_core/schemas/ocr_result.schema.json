@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ocr_result.schema.json",
+  "title": "OCR Result Contract v1.0 / عقد نتيجة OCR الإصدار 1.0",
+  "description": "Unified, versioned result contract for every OCR engine and downstream consumer (ensemble voting, layout, indexer). Engines and consumers read one structure without adapters; external engines exchange it as a JSON file. / عقد موحّد ومُسوّى لنتيجة كل محركات OCR والمستهلكين (مصوّت الـensemble، التخطيط، الفهرس) — بنية واحدة بلا محوّلات، والمحركات الخارجية تتبادلها كملف JSON.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "engine",
+    "language",
+    "text",
+    "words",
+    "page",
+    "processing_ms"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Contract version, pinned to '1.0' for this schema. / إصدار العقد، مثبّت على '1.0' لهذا المخطط."
+    },
+    "engine": {
+      "type": "string",
+      "description": "Reporting engine name; ensemble winners use 'ensemble:<winner>'. May be empty on early failures. / اسم المحرك المُبلِّغ؛ نتائج الـensemble بصيغة 'ensemble:<الفائز>' وقد يكون فارغاً عند فشل مبكر."
+    },
+    "language": {
+      "type": "string",
+      "description": "Primary language tag of the text, e.g. 'ar' or 'en' (target contract: engines currently carry 'ara+eng' in meta.lang). / لغة النص الأساسية مثل 'ar' أو 'en' (حقل مستهدف — المحركات تحملها اليوم داخل meta.lang)."
+    },
+    "text": {
+      "type": "string",
+      "description": "Full recognized text after engine post-processing. / النص الكامل بعد المعالجة."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Page-level confidence on a 0-1 scale; 0.0 means UNKNOWN and is never fabricated (engines/base.py policy). / ثقة على مستوى الصفحة بمقياس 0-1؛ الصفر يعني مجهولة ولا تُختلق أبداً (سياسة engines/base.py)."
+    },
+    "words": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/word"
+      },
+      "description": "Per-word records with text, confidence and bbox (target contract: engines currently keep per-line geometry in internal dicts). / سجل لكل كلمة بنصها وثقتها وصندوقها (حقل مستهدف — المحركات تحتفظ اليوم بهندسة السطور في قواميس داخلية)."
+    },
+    "page": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Zero-based page index this result belongs to (target contract; legacy 'pages' is a page count). / رقم الصفحة ابتداءً من الصفر (حقل مستهدف؛ الحقل القديم 'pages' هو عدد الصفحات)."
+    },
+    "processing_ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Wall-clock processing time in milliseconds (target contract; legacy 'processing_time' is seconds). / زمن المعالجة بالمللي ثانية (حقل مستهدف؛ الحقل القديم 'processing_time' بالثواني)."
+    },
+    "processing_time": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Legacy field found in code: processing time in seconds. / حقل قديم موجود في الكود: زمن المعالجة بالثواني."
+    },
+    "pages": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Legacy field found in code: number of pages in the source document. / حقل قديم موجود في الكود: عدد صفحات المستند."
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Engine-level failure message; null (or absent) on success — failures are reported, never raised. / رسالة فشل المحرك؛ null عند النجاح — الفشل يُبلَّغ ولا يُرمى."
+    },
+    "meta": {
+      "type": "object",
+      "description": "Engine metadata, e.g. ensemble per_engine breakdown, lang, psm. / بيانات وصفية للمحرك، مثل تفصيل per_engine وlang وpsm."
+    },
+    "sidecar": {
+      "type": "object",
+      "description": "Optional auxiliary payload, e.g. manyhands per-engine documents for disagreement views (target contract). / حمولة مساعدة اختيارية، مثل مستندات المحركات لمشاهد الاختلاف (حقل مستهدف)."
+    }
+  },
+  "$defs": {
+    "word": {
+      "title": "Word / كلمة",
+      "description": "One recognized word with its confidence and pixel rectangle. / كلمة واحدة مع ثقتها ومستطيلها بالبكسل.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "text",
+        "confidence",
+        "bbox"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Recognized word text. / نص الكلمة."
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Word confidence on a 0-1 scale; 0.0 = unknown, never fabricated. / ثقة الكلمة بمقياس 0-1؛ الصفر مجهولة ولا تُختلق."
+        },
+        "bbox": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Pixel rectangle [x, y, w, h], top-left origin. Producers MUST convert 4-point polygons (EasyOCR/Paddle) or xyxy boxes (word_detector) to xywh ints. / مستطيل بالبكسل [x, y, العرض, الارتفاع] بنقطة الأصل العلوية اليسرى؛ يجب تحويل المضلعات أو صناديق xyxy إلى xywh."
+        }
+      }
+    }
+  }
+}

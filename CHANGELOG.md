@@ -7,6 +7,11 @@
 > marathon-ocr-core[tesseract] @ git+https://github.com/DrAbdulmalek/ocr-core.git@v0.5.0
 > ```
 
+## غير مُصدر (فرع roadmap/ocr-result-schema)
+
+### أُضيف
+- **عقد `OCRResult` الموحّد صار مخطط JSON صريحًا ومُسوّى (draft-07، `schema_version` ثابت "1.0")** — `src/ocr_core/schemas/ocr_result.schema.json` مع محمّل `ocr_core.schemas.load_schema()` (importlib.resources + مسار احتياطي)، وثيقة العقد `docs/CONTRACT.md` (الحقول المطلوبة، سياسة الثقة 0-1 وصفر = مجهولة، هندسة bbox بصيغة xywh، جسر GPL/AGPL عبر تبادل ملفات فقط)، واختبارات `tests/test_ocr_result_schema.py` (15 اختبارًا) — الأولوية 8 من خارطة الطريق المدمجة: المحركات ومصوّت الـensemble ومشاهد الاختلاف manyhands والفهرس يقرأون بنية واحدة بلا محوّلات.
+
 ## غير مُصدر (فرع fix/import-shadow-arabic-render)
 
 ### أُصلح
