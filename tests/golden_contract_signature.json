@@ -1,0 +1,117 @@
+{
+  "signature_version": 1,
+  "captured_at": "2026-11-25",
+  "captured_from_version": "0.7.0",
+  "contract_issue": "https://github.com/DrAbdulmalek/ocr-core/issues/73",
+  "schema_version": "1.0",
+  "dataclass_fields": [
+    {
+      "name": "text",
+      "type": "str",
+      "default": ""
+    },
+    {
+      "name": "engine",
+      "type": "str",
+      "default": ""
+    },
+    {
+      "name": "confidence",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "processing_time",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "error",
+      "type": "Optional[str]",
+      "default": null
+    },
+    {
+      "name": "pages",
+      "type": "int",
+      "default": 1
+    },
+    {
+      "name": "meta",
+      "type": "dict",
+      "default": "<factory>"
+    }
+  ],
+  "schema_required_top": [
+    "schema_version",
+    "engine",
+    "language",
+    "text",
+    "words",
+    "page",
+    "processing_ms"
+  ],
+  "schema_required_word": [
+    "text",
+    "confidence",
+    "bbox"
+  ],
+  "canonical_example": {
+    "schema_version": "1.0",
+    "engine": "ensemble:tesseract",
+    "language": "ar",
+    "text": "نص تجريبي 123",
+    "confidence": 0.87,
+    "words": [
+      {
+        "text": "نص",
+        "confidence": 0.9,
+        "bbox": [
+          10,
+          20,
+          30,
+          12
+        ]
+      },
+      {
+        "text": "تجريبي",
+        "confidence": 0.84,
+        "bbox": [
+          45,
+          20,
+          52,
+          12
+        ]
+      },
+      {
+        "text": "123",
+        "confidence": 0.0,
+        "bbox": [
+          100,
+          21,
+          20,
+          11
+        ]
+      }
+    ],
+    "page": 0,
+    "processing_ms": 123.4,
+    "error": null,
+    "pages": 1,
+    "processing_time": 0.1234,
+    "meta": {
+      "lang": "ara+eng",
+      "psm": "6"
+    },
+    "sidecar": {
+      "tesseract": {
+        "words": [],
+        "confidence": 0.0
+      }
+    },
+    "engine_extra": {
+      "custom": true
+    }
+  },
+  "license": "MIT",
+  "sha256": "5bf30bcc55d988e33fa8cc363ecf2b3596dafcc642e6abb8abadba66d6440599"
+}

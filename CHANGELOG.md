@@ -7,6 +7,16 @@
 > marathon-ocr-core[tesseract] @ git+https://github.com/DrAbdulmalek/ocr-core.git@v0.5.0
 > ```
 
+## غير مُصدر (فرع feat/contract-gate-73)
+
+### أُضيف
+- **بوابة العقد (issue #73)**: بصمات ذهبية للعقد — `tests/test_contract.py` + `tests/golden_contract_signature.json` (ملف ذاتي التحقق بـsha256) تقفل: حقول `OCRResult` dataclass (الاسم/النمط/الافتراضي)، `schema_version` والحقول المطلوبة للمخطط (أعلى المستوى + الكلمة)، المثال النموذجي (= `VALID_RESULT` حرفيًا — لا مصدرين للحقيقة)، دلالات الثقة 0-1 وbbox xywh، وترخيص MIT. أي انحراف = فشل الاختبار ويوجب تحديث البصمة في نفس الـPR.
+- **حارس CI**: `.github/workflows/contract-guard.yml` + `scripts/ci/contract_guard.py` (stdlib فقط) — أي PR يمس سطح العقد (المخطط، base.py، CONTRACT.md، ملفات البصمة) يفشل ما لم يرفع الإصدار الرئيسي في `pyproject.toml`؛ والكسر إضافيًا يوجب رفع `schema_version` الرئيسي وإشعارًا مسبقًا للمستهلكين الثلاثة.
+- `docs/CONTRACT.md`: قسم «سياسة التغيير» (القواعد الأربع للبوابة)، قسم «المثال النموذجي» (مستند schema-1.0 كامل)، وجدول المستهلكين (toolkit/AMH/MRA + التزام common-core المستقبلي بالاستهلاك لا النسخ).
+
+### مُرقّى
+- **إصدار الحزمة `0.7.0` → `1.0.0`**: البوابة تُطبَّق على نفسها — أول PR يمس سطح العقد رفع الإصدار الرئيسي وفق قاعدتها الجديدة، ومها إشارة أن العقد صار رسميًا ومستقرًا (v1.0.0 = عقد مثبت ببصمات ذهبية وحارس CI).
+
 ## غير مُصدر (فرع roadmap/ocr-result-schema)
 
 ### أُضيف
