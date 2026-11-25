@@ -312,3 +312,19 @@ def test_extract_validates_path_before_loading():
     assert src.index("Path(image_path).exists()") < src.index("_ensure_loaded()"), (
         "التحقق من المسار يجب أن يسبق _ensure_loaded()"
     )
+
+
+def test_extract_with_confidence_marks_score_unknown(monkeypatch, tmp_path):
+    """Jina does not expose calibrated confidence; never synthesize 0.9."""
+    from ocr_core.engines.jina_vlm import JinaVLMEngine, VLMResult
+
+    engine = JinaVLMEngine()
+    monkeypatch.setattr(
+        engine,
+        "extract",
+        lambda image_path: VLMResult(markdown="نص مستخرج", model_id=engine.model_id),
+    )
+    result = engine.extract_with_confidence(str(tmp_path / "synthetic.png"))
+    assert result["text"] == "نص مستخرج"
+    assert result["confidence"] == 0.0
+    assert result["confidence_known"] is False

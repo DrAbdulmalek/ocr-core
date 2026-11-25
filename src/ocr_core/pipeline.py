@@ -37,6 +37,7 @@ changing this module.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -82,6 +83,52 @@ class LayoutMode(str, Enum):
 
 #: Region kinds a layout provider may emit. ``text`` is the fallback kind.
 REGION_KINDS = ("text", "table", "picture", "header", "footer")
+
+_ARABIC_LETTER_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]")
+_LATIN_LETTER_RE = re.compile(r"[A-Za-z]")
+
+
+def _infer_reading_direction(regions: Sequence["RegionRecord"]) -> str:
+    """Infer the dominant script from recognized text, without changing it."""
+    text = " ".join(region.text for region in regions if region.text)
+    arabic_count = len(_ARABIC_LETTER_RE.findall(text))
+    latin_count = len(_LATIN_LETTER_RE.findall(text))
+    return "rtl" if arabic_count > latin_count else "ltr"
+
+
+def _regions_in_reading_order(
+    regions: Sequence["RegionRecord"], direction: str
+) -> list["RegionRecord"]:
+    """Group vertically overlapping regions into lines, then order each line.
+
+    This is a geometry-only reading-order heuristic. It does not reorder
+    characters inside a region and keeps top-to-bottom line order.
+    """
+    candidates = sorted(regions, key=lambda region: (region.bbox[1], region.bbox[0]))
+    lines: list[list[RegionRecord]] = []
+    for region in candidates:
+        _, y, _, height = region.bbox
+        target_line = None
+        if height > 0:
+            for line in lines:
+                line_top = min(item.bbox[1] for item in line)
+                line_bottom = max(item.bbox[1] + item.bbox[3] for item in line)
+                line_height = line_bottom - line_top
+                overlap = max(0, min(y + height, line_bottom) - max(y, line_top))
+                denominator = min(height, line_height)
+                if denominator > 0 and overlap / denominator >= 0.5:
+                    target_line = line
+                    break
+        if target_line is None:
+            lines.append([region])
+        else:
+            target_line.append(region)
+
+    lines.sort(key=lambda line: min(item.bbox[1] for item in line))
+    reverse_x = direction == "rtl"
+    for line in lines:
+        line.sort(key=lambda item: item.bbox[0], reverse=reverse_x)
+    return [region for line in lines for region in line]
 
 
 @dataclass
@@ -464,14 +511,15 @@ class DocumentPipeline:
         regions: Sequence[RegionRecord],
         recognition: OCRResult,
     ) -> StageResult:
-        """Rebuild the page text from regions in reading order (top-left)."""
+        """Rebuild page text using script-aware, geometry-based reading order."""
         start = time.perf_counter()
+        direction = _infer_reading_direction(regions)
         if recognition.error is not None and not recognition.text:
             page.text = ""
         elif len(regions) == 1:
             page.text = recognition.text
         else:
-            ordered = sorted(regions, key=lambda r: (r.bbox[1], r.bbox[0]))
+            ordered = _regions_in_reading_order(regions, direction)
             page.text = "\n".join(r.text for r in ordered if r.text)
         if self.rtl_postprocess is not None and page.text:
             try:
@@ -485,7 +533,7 @@ class DocumentPipeline:
             stage=PipelineStage.PAGE_SYNTHESIS,
             ok=True,
             duration=time.perf_counter() - start,
-            detail={"chars": len(page.text)},
+            detail={"chars": len(page.text), "reading_direction": direction},
         )
 
     def _stage_document_synthesis(self, page: PageResult) -> StageResult:

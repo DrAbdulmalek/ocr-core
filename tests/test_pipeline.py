@@ -290,3 +290,48 @@ def test_stage_trace_and_to_dict_roundtrip_shapes(tmp_path):
     assert trace and trace[0]["page"] == 1
     dumped = result.to_dict()
     assert dumped["ok"] is True and dumped["pages"][0]["page_number"] == 1
+
+
+# ----------------------------------------------------------------------
+# script-aware reading order
+# ----------------------------------------------------------------------
+def _synthesize_regions(regions):
+    from ocr_core.pipeline import PageResult
+
+    pipe = DocumentPipeline(engine=FakeEngine(), preprocess=False)
+    page = PageResult(page_number=1)
+    stage = pipe._stage_page_synthesis(
+        page,
+        regions,
+        OCRResult(text=" ".join(region.text for region in regions), engine="fake"),
+    )
+    return page, stage
+
+
+def test_page_synthesis_orders_arabic_regions_right_to_left():
+    regions = [
+        RegionRecord(bbox=(0, 10, 40, 20), text="الجهة اليسرى"),
+        RegionRecord(bbox=(100, 10, 40, 20), text="الجهة اليمنى"),
+    ]
+    page, stage = _synthesize_regions(regions)
+    assert page.text == "الجهة اليمنى\nالجهة اليسرى"
+    assert stage.detail["reading_direction"] == "rtl"
+
+
+def test_page_synthesis_keeps_latin_regions_left_to_right():
+    regions = [
+        RegionRecord(bbox=(100, 10, 40, 20), text="RIGHT"),
+        RegionRecord(bbox=(0, 10, 40, 20), text="LEFT"),
+    ]
+    page, stage = _synthesize_regions(regions)
+    assert page.text == "LEFT\nRIGHT"
+    assert stage.detail["reading_direction"] == "ltr"
+
+
+def test_page_synthesis_keeps_lines_top_to_bottom_for_rtl():
+    regions = [
+        RegionRecord(bbox=(100, 40, 40, 20), text="السطر الثاني"),
+        RegionRecord(bbox=(0, 10, 40, 20), text="السطر الأول"),
+    ]
+    page, _ = _synthesize_regions(regions)
+    assert page.text == "السطر الأول\nالسطر الثاني"
