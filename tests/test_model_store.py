@@ -176,3 +176,53 @@ def test_store_refuses_symlinked_root(tmp_path):
     archive = _archive(tmp_path / "valid.zip", manifest, files)
     with pytest.raises(ValueError, match="symlink"):
         ModelStore(link).import_archive(archive)
+
+
+def test_model_lease_transitions_state_and_is_exclusive(tmp_path):
+    from ocr_core.model_store import ModelState
+
+    files = {"weights.bin": b"leased"}
+    manifest = _manifest_for(files)
+    archive = _archive(tmp_path / "lease.zip", manifest, files)
+    store = ModelStore(tmp_path / "store")
+    store.import_archive(archive)
+    assert store.status(manifest.model_id, manifest.revision) is ModelState.VERIFIED
+    with store.lease(manifest.model_id, manifest.revision) as model_dir:
+        assert model_dir == store.artifact_path(manifest)
+        assert store.status(manifest.model_id, manifest.revision) is ModelState.IN_USE
+        with pytest.raises(FileExistsError):
+            with store.lease(manifest.model_id, manifest.revision):
+                pass
+    assert store.status(manifest.model_id, manifest.revision) is ModelState.VERIFIED
+
+
+def test_stale_lease_is_reported_but_never_auto_removed(tmp_path):
+    from ocr_core.model_store import ModelState
+
+    files = {"weights.bin": b"stale"}
+    manifest = _manifest_for(files)
+    archive = _archive(tmp_path / "stale.zip", manifest, files)
+    store = ModelStore(tmp_path / "store")
+    store.import_archive(archive)
+    leases = store.root / ".leases"
+    leases.mkdir()
+    lock = leases / (manifest.storage_key + ".lock")
+    lock.write_text("999999\\n", encoding="ascii")
+    assert store.status(manifest.model_id, manifest.revision) is ModelState.IN_USE
+    with pytest.raises(FileExistsError):
+        with store.lease(manifest.model_id, manifest.revision):
+            pass
+    assert lock.exists()
+
+
+def test_get_verified_file_only_returns_manifest_declared_paths(tmp_path):
+    files = {"weights/model.onnx": b"declared"}
+    manifest = _manifest_for(files)
+    archive = _archive(tmp_path / "file.zip", manifest, files)
+    store = ModelStore(tmp_path / "store")
+    store.import_archive(archive)
+    assert store.get_verified_file(
+        manifest.model_id, manifest.revision, "weights/model.onnx"
+    ).read_bytes() == b"declared"
+    with pytest.raises(KeyError):
+        store.get_verified_file(manifest.model_id, manifest.revision, "other.bin")
