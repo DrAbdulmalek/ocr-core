@@ -97,3 +97,77 @@ draft-07 (structural checks always; `jsonschema` checks when the library
 is installed), a valid sample passes, and a sample missing
 `words[].bbox` fails. The dataclass fields of `OCRResult` must stay
 covered by the schema's properties.
+
+`tests/test_contract.py` (the **contract gate**, issue #73) additionally
+pins the whole surface across versions via a hashed golden snapshot in
+[`tests/golden_contract_signature.json`](../tests/golden_contract_signature.json):
+dataclass field signatures, schema version and required fields, the
+canonical example below, the confidence/bbox semantics and the MIT
+license. The golden file is self-verifying (sha256 over its own payload).
+
+## Canonical example
+
+The canonical schema-1.0 document — pinned as the golden signature and
+kept identical to `VALID_RESULT` in `tests/test_ocr_result_schema.py`
+(two sources of truth are not allowed: they drift, or they are one):
+
+```json
+{
+  "schema_version": "1.0",
+  "engine": "ensemble:tesseract",
+  "language": "ar",
+  "text": "نص تجريبي 123",
+  "confidence": 0.87,
+  "words": [
+    {"text": "نص", "confidence": 0.9, "bbox": [10, 20, 30, 12]},
+    {"text": "تجريبي", "confidence": 0.84, "bbox": [45, 20, 52, 12]},
+    {"text": "123", "confidence": 0.0, "bbox": [100, 21, 20, 11]}
+  ],
+  "page": 0,
+  "processing_ms": 123.4,
+  "error": null,
+  "pages": 1,
+  "processing_time": 0.1234,
+  "meta": {"lang": "ara+eng", "psm": "6"},
+  "sidecar": {"tesseract": {"words": [], "confidence": 0.0}},
+  "engine_extra": {"custom": true}
+}
+```
+
+## Change policy / سياسة التغيير
+
+The **contract surface** is everything that defines what producers emit
+and what consumers read: `src/ocr_core/schemas/`, `docs/CONTRACT.md`,
+`src/ocr_core/engines/base.py` (`OCRResult`), the golden signature
+(`tests/golden_contract_signature.json`, `tests/test_contract.py`).
+
+Gate rules (issue #73, decided 2026-11-25 — enforced mechanically by
+`.github/workflows/contract-guard.yml` + `scripts/ci/contract_guard.py`):
+
+1. **Any change to the contract surface requires a MAJOR package version
+   bump** (`0.7.0 → 1.0.0`, then `1.x.y → (x+1).0.0`). A PR touching any
+   of these files without a major bump fails CI.
+2. **Breaking changes** (removing/renaming a field, changing a type,
+   adding a required field, tightening a constraint) additionally bump
+   the schema major (`schema_version` `"1.0"` → `"2.0"`) and require
+   **advance notice**: an issue opened *before* merge, linking the three
+   consumer repos below, left open until each confirms a migration path.
+3. The golden signature is updated **in the same PR** as the change, with
+   a one-line justification in the PR description.
+4. Deprecations are additive first: a field is removed only in a later
+   major release that follows rule 2.
+
+## Consumers
+
+The contract exists because these repos depend on `OCRResult` (the
+consolidation plan's "core + consumers" architecture; consumer
+registration tracked in the merge-plan issues):
+
+| Repo | Reads | Tracking |
+|---|---|---|
+| [`arabic-handwriting-ocr-toolkit`](https://github.com/DrAbdulmalek/arabic-handwriting-ocr-toolkit) | engine results + corrections dataset | migration issue #1 (AHT-01) |
+| [`arabic-medical-handwriting`](https://github.com/DrAbdulmalek/arabic-medical-handwriting) | engine results | issue #7 (AMH-01) |
+| [`medical-rag-ar`](https://github.com/DrAbdulmalek/medical-rag-ar) | engine results before release | compatibility issue #5 (MRA-01) |
+
+`common-core`, when seeded (RST-02), must consume this contract — never
+copy it.
