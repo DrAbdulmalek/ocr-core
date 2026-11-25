@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Protocol
 
+from ocr_core.model_access import DEFAULT_MODEL_ACCESS_POLICY, ModelAccessPolicy
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,6 +68,10 @@ class WordDetector(Protocol):
 # ==============================================================
 # 1. كاشف ONNX — xournalpp-htr-word-detector
 # ==============================================================
+class LocalModelUnavailableError(FileNotFoundError):
+    """Raised when a model is unavailable locally and remote access is blocked."""
+
+
 class OnnxWordDetector:
     """كاشف يعتمد على نموذج xournalpp-htr-word-detector (MIT).
 
@@ -82,13 +88,18 @@ class OnnxWordDetector:
         model_id: str = "PellelNitram/xournalpp-htr-word-detector",
         min_confidence: float = 0.3,
         cache_dir: Optional[Path] = None,
+        access_policy: Optional[ModelAccessPolicy] = None,
+        fallback_to_projection: bool = False,
     ):
         self.model_id = model_id
         self.min_confidence = min_confidence
         self.cache_dir = cache_dir
+        self.access_policy = access_policy or DEFAULT_MODEL_ACCESS_POLICY
+        self.fallback_to_projection = fallback_to_projection
 
         self._session = None
         self._loaded = False
+        self._fallback_detector = None
 
     def _ensure_loaded(self):
         """تحميل النموذج كسولاً — لا يحمّل شيئًا حتى أول استدعاء."""
@@ -103,8 +114,19 @@ class OnnxWordDetector:
                 "أو: pip install xournalpp-htr"
             )
 
-        # حمّل النموذج من HuggingFace (مع تخزين مؤقت)
-        model_path = self._download_model()
+        # Resolve from cache by default; never turn a cache miss into a download.
+        try:
+            model_path = self._download_model()
+        except LocalModelUnavailableError as exc:
+            if self.fallback_to_projection and self.access_policy.local_files_only:
+                logger.warning(
+                    "النموذج غير متاح محليًا؛ استخدام ProjectionDetector دون شبكة (%s)",
+                    type(exc).__name__,
+                )
+                self._fallback_detector = ProjectionDetector()
+                self._loaded = True
+                return
+            raise
 
         sess_options = ort.SessionOptions()
         sess_options.graph_optimization_level = (
@@ -124,22 +146,38 @@ class OnnxWordDetector:
         """ينزّل النموذج إلى cache إن لم يكن موجودًا."""
         try:
             from huggingface_hub import hf_hub_download
-        except ImportError:
-            raise ImportError("pip install huggingface_hub")
+        except ImportError as exc:
+            raise LocalModelUnavailableError(
+                "huggingface_hub is not installed; no remote fallback is permitted"
+            ) from exc
 
         cache = self.cache_dir or Path.home() / ".cache" / "ocr_core" / "models"
         cache.mkdir(parents=True, exist_ok=True)
 
-        path = hf_hub_download(
-            repo_id=self.model_id,
-            filename="model.onnx",
-            cache_dir=str(cache),
-        )
-        return Path(path)
+        try:
+            path = hf_hub_download(
+                repo_id=self.model_id,
+                filename="model.onnx",
+                cache_dir=str(cache),
+                local_files_only=self.access_policy.local_files_only,
+            )
+        except Exception as exc:
+            if self.access_policy.local_files_only:
+                raise LocalModelUnavailableError(
+                    "model is not available in the local cache; remote access is blocked by policy"
+                ) from exc
+            raise
+
+        resolved = Path(path)
+        if not resolved.is_file():
+            raise LocalModelUnavailableError("resolved ONNX model file does not exist locally")
+        return resolved
 
     def detect(self, image) -> list[BBox]:
         """يكشف الكلمات ويعيد BBox بإحداثيات الصورة الأصلية."""
         self._ensure_loaded()
+        if self._fallback_detector is not None:
+            return self._fallback_detector.detect(image)
 
         import numpy as np
         from PIL import Image
@@ -383,6 +421,7 @@ def create_detector(
     if kind == "auto":
         try:
             import onnxruntime  # noqa
+            kwargs.setdefault("fallback_to_projection", True)
             return OnnxWordDetector(**kwargs)
         except ImportError:
             logger.info("onnxruntime غير مثبت — استخدام projection")
