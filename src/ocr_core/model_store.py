@@ -23,6 +23,7 @@ from typing import Any, Iterator, Mapping
 _MANIFEST_NAME = "model-manifest.json"
 _STORED_MANIFEST_NAME = "manifest.json"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_REVISION_RE = re.compile(r"^[0-9a-f]{40,64}$")
 _DRIVE_RE = re.compile(r"^[A-Za-z]:")
 
 
@@ -79,6 +80,8 @@ class ModelManifest:
                 raise ValueError(f"{name} must be a non-empty string")
         if self.schema_version != "1.0":
             raise ValueError(f"unsupported model manifest schema: {self.schema_version!r}")
+        if not _REVISION_RE.fullmatch(self.revision):
+            raise ValueError("revision must be an immutable 40-64 character lowercase commit SHA")
         if not self.files:
             raise ValueError("manifest must declare at least one model file")
         paths = [item.path for item in self.files]
