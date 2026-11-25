@@ -7,6 +7,32 @@
 > marathon-ocr-core[tesseract] @ git+https://github.com/DrAbdulmalek/ocr-core.git@v0.5.0
 > ```
 
+## غير مُصدر (فرع fix/offline-local-only-model-resolution)
+
+### أُضيف
+- **سياسة الوصول للنماذج `ocr_core.model_policy` (issue #79، تتبّع #77 و IFM#89)**:
+  مفردات بلا أي تبعيات — `LOCAL_ONLY` (الافتراضي)، `EXPLICIT_REMOTE`
+  (الشبكة فقط مع `remote_authorized=True`)، `REMOTE_DISABLED`؛ المحاكم:
+  بارامتر المُنشئ > بيئة (`OCR_CORE_MODEL_POLICY`/`OCR_CORE_REMOTE_AUTHORIZED`)
+  > الافتراضي، ووضع غير معروف يفشل مغلقًا (`ValueError`) بلا تخمين صامت،
+  و`ModelArtifactMissingError` برسالة قابلة للتنفيذ عند نقص الخزنة.
+
+### مُعدَّل
+- **حل النماذج محلي-فقط افتراضيًا**: `OnnxWordDetector` و`JinaVLMEngine`
+  يحلّان الأثر من الخزنة المحلية أولًا (`local_files_only=True`)، ونقص
+  الأثر يفشل مغلقًا بلا أي محاولة شبكة ولا إعادة محاولة بعيدة؛ الشبكة
+  محاولة واحدة صريحة فقط مع `EXPLICIT_REMOTE` مصرّح (منع cache-miss
+  retries بالتصميم).
+- **المسار الآلي لكواشف الكلمات**: `create_detector("auto")` يتراجع إلى
+  `ProjectionDetector` عند غياب الأثر المحلي مع منع البُعد (ومفاتيح
+  onnx الخاصة تُفلتر عن projection)؛ الاختيار الصريح `kind="onnx"` يبقى
+  فشلًا مغلقًا عند نقص الأثر.
+- **15 اختبارًا جديدًا** (`tests/test_model_policy.py`): استيراد النواة
+  بلا huggingface_hub/transformers/torch/onnxruntime/requests (مفسّر
+  معزول `-I` بجذر استيراد src فقط)، جدول التصريح الصريح، سلوك نقص
+  الخزنة بلا إعادة محاولة (stubs تسجّل النداءات)، الـfallback المحلي
+  للمسار الآلي، وفشل jina المغلق — كلها اصطناعية بلا شبكة وبلا أوزان.
+
 ## غير مُصدر (فرع feat/contract-gate-73)
 
 ### أُضيف

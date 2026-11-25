@@ -14,6 +14,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Protocol
 
+from ocr_core.model_policy import (
+    ModelAccessPolicy,
+    ModelArtifactMissingError,
+    artifact_missing_message,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -82,10 +88,14 @@ class OnnxWordDetector:
         model_id: str = "PellelNitram/xournalpp-htr-word-detector",
         min_confidence: float = 0.3,
         cache_dir: Optional[Path] = None,
+        policy: Optional[str] = None,
+        remote_authorized: Optional[bool] = None,
     ):
         self.model_id = model_id
         self.min_confidence = min_confidence
         self.cache_dir = cache_dir
+        # سياسة الوصول: بارامتر > بيئة > LOCAL_ONLY (الافتراضي — بلا شبكة)
+        self.policy = ModelAccessPolicy.resolve(policy, remote_authorized)
 
         self._session = None
         self._loaded = False
@@ -103,8 +113,8 @@ class OnnxWordDetector:
                 "أو: pip install xournalpp-htr"
             )
 
-        # حمّل النموذج من HuggingFace (مع تخزين مؤقت)
-        model_path = self._download_model()
+        # حمّل الأثر من الخزنة المحلية — الشبكة فقط بتصريح صريح (#79)
+        model_path = self._resolve_model()
 
         sess_options = ort.SessionOptions()
         sess_options.graph_optimization_level = (
@@ -120,8 +130,13 @@ class OnnxWordDetector:
         self._loaded = True
         logger.info("تم تحميل WordDetector من %s", self.model_id)
 
-    def _download_model(self) -> Path:
-        """ينزّل النموذج إلى cache إن لم يكن موجودًا."""
+    def _resolve_model(self) -> Path:
+        """يحلّ الأثر محليًا أولًا — الشبكة فقط مع EXPLICIT_REMOTE مصرّح.
+
+        LOCAL_ONLY (الافتراضي): نقص الأثر = ``ModelArtifactMissingError``
+        فورًا بلا أي محاولة شبكة — منع إعادة المحاولة البعيدة عند نقص
+        الخزنة (OCR-05/#79). REMOTE_DISABLED يمنع الشبكة حتى مع التصريح.
+        """
         try:
             from huggingface_hub import hf_hub_download
         except ImportError:
@@ -130,12 +145,44 @@ class OnnxWordDetector:
         cache = self.cache_dir or Path.home() / ".cache" / "ocr_core" / "models"
         cache.mkdir(parents=True, exist_ok=True)
 
-        path = hf_hub_download(
-            repo_id=self.model_id,
-            filename="model.onnx",
-            cache_dir=str(cache),
-        )
-        return Path(path)
+        try:
+            path = hf_hub_download(
+                repo_id=self.model_id,
+                filename="model.onnx",
+                cache_dir=str(cache),
+                local_files_only=True,
+            )
+            return Path(path)
+        except OSError as local_err:  # نقص محلي أو وضع offline
+            if not self.policy.allows_remote():
+                raise ModelArtifactMissingError(
+                    artifact_missing_message(self.model_id, cache)
+                ) from local_err
+            # EXPLICIT_REMOTE مصرّح: محاولة بعيدة واحدة صريحة — لا إعادة محاولة
+            path = hf_hub_download(
+                repo_id=self.model_id,
+                filename="model.onnx",
+                cache_dir=str(cache),
+            )
+            return Path(path)
+
+    def has_local_artifact(self) -> bool:
+        """هل الأثر مخزّن محليًا؟ فحص بلا شبكة وبلا onnxruntime."""
+        try:
+            from huggingface_hub import hf_hub_download
+        except ImportError:
+            return False
+        cache = self.cache_dir or Path.home() / ".cache" / "ocr_core" / "models"
+        try:
+            hf_hub_download(
+                repo_id=self.model_id,
+                filename="model.onnx",
+                cache_dir=str(cache),
+                local_files_only=True,
+            )
+            return True
+        except OSError:
+            return False
 
     def detect(self, image) -> list[BBox]:
         """يكشف الكلمات ويعيد BBox بإحداثيات الصورة الأصلية."""
@@ -375,18 +422,34 @@ def create_detector(
     """ينشئ كاشفًا حسب النوع.
 
     kinds:
-      "onnx"       — الأفضل جودة، يحتاج onnxruntime
+      "onnx"       — الأفضل جودة، يحتاج onnxruntime + أثرًا محليًا (أو تصريحًا)
       "projection" — الأسرع، بلا تبعيات ثقيلة
       "heuristic"  — للطوارئ فقط
-      "auto"       — يحاول onnx ثم projection ثم heuristic
+      "auto"       — المسار الآلي: onnx إن كان الأثر محليًا متاحًا
+                     (أو البُعد مصرّحًا) وإلا projection ثم heuristic
     """
+    def _projection_kwargs() -> dict:
+        # فلترة مفاتيح onnx الخاصة حتى لا تنفجر شاشة projection بـTypeError
+        valid = ProjectionDetector.__init__.__code__.co_varnames
+        return {k: v for k, v in kwargs.items() if k in valid}
+
     if kind == "auto":
         try:
             import onnxruntime  # noqa
-            return OnnxWordDetector(**kwargs)
         except ImportError:
             logger.info("onnxruntime غير مثبت — استخدام projection")
-            return ProjectionDetector(**kwargs)
+            return ProjectionDetector(**_projection_kwargs())
+        # المسار الآلي (#79): الأثر غير مخزّن محليًا والشبكة ممنوعة
+        # → fallback إلى projection. الاختيار الصريح kind="onnx"
+        # يبقى فشلًا مغلقًا عند نقص الأثر.
+        auto = OnnxWordDetector(**kwargs)
+        if auto.policy.allows_remote() or auto.has_local_artifact():
+            return auto
+        logger.info(
+            "أثر ONNX غير مخزّن محليًا وسياسة %s — fallback إلى projection",
+            auto.policy.mode,
+        )
+        return ProjectionDetector(**_projection_kwargs())
 
     if kind == "onnx":
         return OnnxWordDetector(**kwargs)

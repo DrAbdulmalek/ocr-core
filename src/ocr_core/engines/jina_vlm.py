@@ -16,6 +16,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from ocr_core.model_policy import (
+    ModelAccessPolicy,
+    ModelArtifactMissingError,
+    artifact_missing_message,
+)
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_ID = "jinaai/jina-ocr-v1"
@@ -63,12 +69,16 @@ class JinaVLMEngine:
         prompt: str = DEFAULT_PROMPT,
         max_new_tokens: int = 4096,
         cache_dir: Optional[Path] = None,
+        policy: Optional[str] = None,
+        remote_authorized: Optional[bool] = None,
     ):
         self.model_id = model_id
         self.device = device
         self.prompt = prompt
         self.max_new_tokens = max_new_tokens
         self.cache_dir = cache_dir
+        # سياسة الوصول: بارامتر > بيئة > LOCAL_ONLY (الافتراضي — بلا شبكة)
+        self.policy = ModelAccessPolicy.resolve(policy, remote_authorized)
 
         self._model = None
         self._processor = None
@@ -96,18 +106,45 @@ class JinaVLMEngine:
 
         logger.info("تحميل %s على %s...", self.model_id, self._device)
 
-        # ⚠️ trust_remote_code=True إلزامي لهذا النموذج
-        self._processor = AutoProcessor.from_pretrained(
-            self.model_id,
+        # ⚠️ trust_remote_code=True إلزامي لهذا النموذج (الكود المحلي فقط —
+        #    السياسة تمنع جلب أثر جديد من الشبكة، لا تدقيق كود مخزّن سلفًا)
+        common_kwargs: dict = dict(
             trust_remote_code=True,
             cache_dir=str(self.cache_dir) if self.cache_dir else None,
         )
-        self._model = AutoModelForCausalLM.from_pretrained(
-            self.model_id,
-            dtype=torch.bfloat16,
-            trust_remote_code=True,
-            cache_dir=str(self.cache_dir) if self.cache_dir else None,
-        ).to(self._device)
+        if not self.policy.allows_remote():
+            # LOCAL_ONLY/REMOTE_DISABLED (#79): الخزنة المحلية فقط —
+            # نقص الأثر = فشل مغلق، بلا أي محاولة شبكة أو إعادة محاولة.
+            try:
+                self._processor = AutoProcessor.from_pretrained(
+                    self.model_id,
+                    local_files_only=True,
+                    **common_kwargs,
+                )
+                self._model = AutoModelForCausalLM.from_pretrained(
+                    self.model_id,
+                    dtype=torch.bfloat16,
+                    local_files_only=True,
+                    **common_kwargs,
+                ).to(self._device)
+            except OSError as local_err:  # نقص محلي أو وضع offline
+                raise ModelArtifactMissingError(
+                    artifact_missing_message(
+                        self.model_id,
+                        self.cache_dir
+                        or Path.home() / ".cache" / "huggingface" / "hub",
+                    )
+                ) from local_err
+        else:
+            # EXPLICIT_REMOTE مصرّح: محاولة واحدة صريحة (قد تنزل الأثر)
+            self._processor = AutoProcessor.from_pretrained(
+                self.model_id, **common_kwargs,
+            )
+            self._model = AutoModelForCausalLM.from_pretrained(
+                self.model_id,
+                dtype=torch.bfloat16,
+                **common_kwargs,
+            ).to(self._device)
 
         self._model.eval()
         logger.info("✅ %s جاهز", self.model_id)
