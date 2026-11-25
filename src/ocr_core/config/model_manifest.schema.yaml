@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://drabdulmalek.github.io/ocr-core/schemas/model_manifest.schema.json",
+  "$id": "https://drabdulmalek.github.io/ocr-core/schemas/model_manifest.schema.yaml",
   "title": "OCR Core Model Manifest",
   "description": "Offline model artifact inventory. License and provenance fields are declarations, not legal verification.",
   "type": "object",
@@ -17,7 +17,7 @@
   "properties": {
     "schema_version": { "const": "1.0" },
     "model_id": { "type": "string", "minLength": 1 },
-    "revision": { "type": "string", "minLength": 1 },
+    "revision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
     "task": { "type": "string", "minLength": 1 },
     "framework": { "type": "string", "minLength": 1 },
     "license_id": { "type": "string", "minLength": 1 },
