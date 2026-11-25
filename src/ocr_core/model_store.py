@@ -173,13 +173,21 @@ class ModelRegistry:
         self.root = Path(root)
         self.manifests_dir = self.root / "manifests"
 
-    def _prepare(self) -> None:
-        self.root.mkdir(parents=True, exist_ok=True)
+    def _validate_layout(self) -> None:
+        """Reject symlinked or non-directory registry path components without mutation."""
         if self.root.is_symlink():
             raise ValueError("model registry root must not be a symlink")
-        self.manifests_dir.mkdir(parents=True, exist_ok=True)
+        if self.root.exists() and not self.root.is_dir():
+            raise ValueError("model registry root must be a directory")
         if self.manifests_dir.is_symlink():
             raise ValueError("model registry manifests directory must not be a symlink")
+        if self.manifests_dir.exists() and not self.manifests_dir.is_dir():
+            raise ValueError("model registry manifests path must be a directory")
+
+    def _prepare(self) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.manifests_dir.mkdir(parents=True, exist_ok=True)
+        self._validate_layout()
 
     def register(self, manifest: ModelManifest, *, overwrite: bool = False) -> Path:
         self._prepare()
@@ -210,6 +218,7 @@ class ModelRegistry:
             temp.unlink(missing_ok=True)
 
     def get(self, model_id: str, revision: str) -> ModelManifest:
+        self._validate_layout()
         key = hashlib.sha256((model_id + "\0" + revision).encode("utf-8")).hexdigest()
         path = self.manifests_dir / (key + ".json")
         if path.is_symlink():
@@ -249,7 +258,15 @@ class ModelStore:
     def verify(self, manifest: ModelManifest) -> bool:
         """Verify exact file set, sizes, hashes, and stored manifest; no mutation."""
         root = self.artifact_path(manifest)
-        if root.is_symlink() or not root.is_dir():
+        # Check every store path component, not only the final artifact directory.
+        # Otherwise a replaced artifacts directory symlink could redirect verification
+        # outside the configured store root.
+        if (
+            self.root.is_symlink()
+            or self.artifacts_dir.is_symlink()
+            or root.is_symlink()
+            or not root.is_dir()
+        ):
             return False
         expected = {item.path: item for item in manifest.files}
         actual: set[str] = set()
