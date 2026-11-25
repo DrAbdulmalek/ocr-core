@@ -1,4 +1,5 @@
 """Engine adapters resolve only verified local ModelStore artifacts."""
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,14 @@ def test_onnx_detector_uses_verified_store_without_huggingface(monkeypatch, tmp_
         def __init__(self, root):
             calls.append(("root", Path(root)))
 
+        @contextmanager
+        def lease(self, model_id, revision):
+            calls.append(("lease-enter", model_id, revision))
+            try:
+                yield expected.parent
+            finally:
+                calls.append(("lease-exit", model_id, revision))
+
         def get_verified_file(self, model_id, revision, relative_path):
             calls.append((model_id, revision, relative_path))
             return expected
@@ -21,6 +30,9 @@ def test_onnx_detector_uses_verified_store_without_huggingface(monkeypatch, tmp_
     detector = OnnxWordDetector(model_store_root=tmp_path / "store", model_revision="a" * 40)
     assert detector._resolve_model() == expected
     assert calls[-1] == (detector.model_id, "a" * 40, "model.onnx")
+    assert ("lease-enter", detector.model_id, "a" * 40) in calls
+    detector.close()
+    assert ("lease-exit", detector.model_id, "a" * 40) in calls
 
 
 def test_onnx_store_requires_revision(tmp_path):
@@ -37,14 +49,19 @@ def test_jina_resolves_verified_snapshot_directory(monkeypatch, tmp_path):
         def __init__(self, root):
             assert Path(root) == tmp_path / "store"
 
-        def get_verified(self, model_id, revision):
+        @contextmanager
+        def lease(self, model_id, revision):
             assert model_id == "jinaai/jina-ocr-v1"
             assert revision == "b" * 40
-            return expected
+            try:
+                yield expected
+            finally:
+                seen["lease_released"] = True
 
     monkeypatch.setattr("ocr_core.model_store.ModelStore", StoreStub)
     engine = JinaVLMEngine(model_store_root=tmp_path / "store", model_revision="b" * 40)
     assert engine._resolve_model_source() == str(expected)
+    assert "lease_released" not in locals()
 
 
 def test_jina_store_requires_revision(tmp_path):
@@ -62,6 +79,13 @@ def test_onnx_engine_loads_from_verified_store_path(monkeypatch, tmp_path):
     seen = {}
     class StoreStub:
         def __init__(self, root): pass
+        @contextmanager
+        def lease(self, model_id, revision):
+            seen["lease_entered"] = True
+            try:
+                yield model_path.parent
+            finally:
+                seen["lease_released"] = True
         def get_verified_file(self, model_id, revision, relative_path):
             seen["store"] = (model_id, revision, relative_path)
             return model_path
@@ -86,6 +110,10 @@ def test_onnx_engine_loads_from_verified_store_path(monkeypatch, tmp_path):
     assert detector._loaded is True
     assert seen["session"][0] == str(model_path)
     assert seen["store"][2] == "weights.onnx"
+    assert seen["lease_entered"] is True
+    assert "lease_released" not in seen
+    detector.close()
+    assert seen["lease_released"] is True
 
 
 def test_jina_engine_loads_verified_snapshot_without_remote_resolution(monkeypatch, tmp_path):
@@ -97,7 +125,13 @@ def test_jina_engine_loads_verified_snapshot_without_remote_resolution(monkeypat
     seen = {"processor": [], "model": []}
     class StoreStub:
         def __init__(self, root): pass
-        def get_verified(self, model_id, revision): return snapshot
+        @contextmanager
+        def lease(self, model_id, revision):
+            seen["lease_entered"] = True
+            try:
+                yield snapshot
+            finally:
+                seen["lease_released"] = True
     class Model:
         def to(self, device): return self
         def eval(self): pass
@@ -131,3 +165,7 @@ def test_jina_engine_loads_verified_snapshot_without_remote_resolution(monkeypat
     assert seen["model"][0][0] == str(snapshot)
     assert seen["processor"][0][1]["local_files_only"] is True
     assert seen["model"][0][1]["local_files_only"] is True
+    assert seen["lease_entered"] is True
+    assert "lease_released" not in seen
+    engine.close()
+    assert seen["lease_released"] is True

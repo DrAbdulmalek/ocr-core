@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import ExitStack
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -89,15 +90,19 @@ class JinaVLMEngine:
         self._model = None
         self._processor = None
         self._device = None
+        self._store_lease_stack = ExitStack()
 
     def _resolve_model_source(self) -> str:
         """Resolve a verified local ModelStore snapshot or the HF model id."""
         if self.model_store_root is None:
             return self.model_id
         from ocr_core.model_store import ModelStore
-        return str(ModelStore(self.model_store_root).get_verified(
-            self.model_id, self.model_revision
-        ))
+        store = ModelStore(self.model_store_root)
+        # Hold the lease until close() releases the loaded model and processor.
+        model_dir = self._store_lease_stack.enter_context(
+            store.lease(self.model_id, self.model_revision)
+        )
+        return str(model_dir)
 
     def _ensure_loaded(self):
         """تحميل كسول — لا يُحمّل حتى أول استخراج."""
@@ -128,42 +133,53 @@ class JinaVLMEngine:
             trust_remote_code=True,
             cache_dir=str(self.cache_dir) if self.cache_dir else None,
         )
-        if self.model_store_root is not None or not self.policy.allows_remote():
-            # LOCAL_ONLY/REMOTE_DISABLED (#79): الخزنة المحلية فقط —
-            # نقص الأثر = فشل مغلق، بلا أي محاولة شبكة أو إعادة محاولة.
-            try:
+        try:
+            if self.model_store_root is not None or not self.policy.allows_remote():
+                # LOCAL_ONLY/REMOTE_DISABLED (#79): الخزنة المحلية فقط —
+                # نقص الأثر = فشل مغلق، بلا أي محاولة شبكة أو إعادة محاولة.
+                try:
+                    self._processor = AutoProcessor.from_pretrained(
+                        model_source,
+                        local_files_only=True,
+                        **common_kwargs,
+                    )
+                    self._model = AutoModelForCausalLM.from_pretrained(
+                        model_source,
+                        dtype=torch.bfloat16,
+                        local_files_only=True,
+                        **common_kwargs,
+                    ).to(self._device)
+                except OSError as local_err:  # نقص محلي أو وضع offline
+                    raise ModelArtifactMissingError(
+                        artifact_missing_message(
+                            self.model_id,
+                            self.cache_dir
+                            or Path.home() / ".cache" / "huggingface" / "hub",
+                        )
+                    ) from local_err
+            else:
+                # EXPLICIT_REMOTE مصرّح: محاولة واحدة صريحة (قد تنزل الأثر)
                 self._processor = AutoProcessor.from_pretrained(
-                    model_source,
-                    local_files_only=True,
-                    **common_kwargs,
+                    model_source, **common_kwargs,
                 )
                 self._model = AutoModelForCausalLM.from_pretrained(
                     model_source,
                     dtype=torch.bfloat16,
-                    local_files_only=True,
                     **common_kwargs,
                 ).to(self._device)
-            except OSError as local_err:  # نقص محلي أو وضع offline
-                raise ModelArtifactMissingError(
-                    artifact_missing_message(
-                        self.model_id,
-                        self.cache_dir
-                        or Path.home() / ".cache" / "huggingface" / "hub",
-                    )
-                ) from local_err
-        else:
-            # EXPLICIT_REMOTE مصرّح: محاولة واحدة صريحة (قد تنزل الأثر)
-            self._processor = AutoProcessor.from_pretrained(
-                model_source, **common_kwargs,
-            )
-            self._model = AutoModelForCausalLM.from_pretrained(
-                model_source,
-                dtype=torch.bfloat16,
-                **common_kwargs,
-            ).to(self._device)
 
-        self._model.eval()
+            self._model.eval()
+        except BaseException:
+            self.close()
+            raise
         logger.info("✅ %s جاهز", model_source)
+
+    def close(self) -> None:
+        """Release loaded model objects and any ModelStore lease."""
+        self._model = None
+        self._processor = None
+        self._store_lease_stack.close()
+        self._store_lease_stack = ExitStack()
 
     def extract(
         self,

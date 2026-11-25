@@ -77,3 +77,12 @@ license, provenance, intended use, and resource requirements before activation.
 ## Engine integration
 
 ModelStore can be supplied to OnnxWordDetector and JinaVLMEngine with model_store_root and an immutable model_revision (40–64 lowercase hex characters). ONNX additionally accepts model_file (default model.onnx). The engines resolve only through get_verified_file() or get_verified(); integrity failures are surfaced and never trigger a Hugging Face retry. The Jina snapshot must contain the complete local Transformers processor/model files. No model weights are bundled with this repository.
+
+
+## Engine lease ownership
+
+When an engine is configured with `model_store_root`, it holds an exclusive
+ModelStore lease for as long as its ONNX session or Jina model/processor is
+loaded. Call the engine's `close()` method when the engine is no longer in
+use; this releases the lease and clears loaded engine references. If model
+loading fails, the engine releases the lease before propagating the error.

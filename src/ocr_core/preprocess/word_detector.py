@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Protocol
@@ -107,6 +108,7 @@ class OnnxWordDetector:
 
         self._session = None
         self._loaded = False
+        self._store_lease_stack = ExitStack()
 
     def _ensure_loaded(self):
         """تحميل النموذج كسولاً — لا يحمّل شيئًا حتى أول استدعاء."""
@@ -130,11 +132,15 @@ class OnnxWordDetector:
         )
         sess_options.intra_op_num_threads = 4
 
-        self._session = ort.InferenceSession(
-            str(model_path),
-            sess_options=sess_options,
-            providers=["CPUExecutionProvider"],
-        )
+        try:
+            self._session = ort.InferenceSession(
+                str(model_path),
+                sess_options=sess_options,
+                providers=["CPUExecutionProvider"],
+            )
+        except BaseException:
+            self.close()
+            raise
         self._loaded = True
         logger.info("تم تحميل WordDetector من %s", self.model_id)
 
@@ -147,7 +153,12 @@ class OnnxWordDetector:
         """
         if self.model_store_root is not None:
             from ocr_core.model_store import ModelStore
-            return ModelStore(self.model_store_root).get_verified_file(
+            store = ModelStore(self.model_store_root)
+            # Keep the artifact leased for the full lifetime of the loaded session.
+            self._store_lease_stack.enter_context(
+                store.lease(self.model_id, self.model_revision)
+            )
+            return store.get_verified_file(
                 self.model_id, self.model_revision, self.model_file
             )
 
@@ -179,6 +190,13 @@ class OnnxWordDetector:
                 cache_dir=str(cache),
             )
             return Path(path)
+
+    def close(self) -> None:
+        """Release the ONNX session and any ModelStore lease held by it."""
+        self._session = None
+        self._loaded = False
+        self._store_lease_stack.close()
+        self._store_lease_stack = ExitStack()
 
     def has_local_artifact(self) -> bool:
         """هل الأثر مخزّن محليًا؟ فحص بلا شبكة وبلا onnxruntime."""
