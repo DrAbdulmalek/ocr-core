@@ -422,7 +422,7 @@ class ModelStore:
         fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         lock_stat = os.fstat(fd)
         try:
-            os.write(fd, (str(os.getpid()) + "\\n").encode("ascii"))
+            os.write(fd, (str(os.getpid()) + "\n").encode("ascii"))
             os.fsync(fd)
             yield model_dir
         finally:
