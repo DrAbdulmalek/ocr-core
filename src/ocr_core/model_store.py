@@ -31,7 +31,7 @@ def _safe_relative_path(value: str) -> PurePosixPath:
     if "\\" in value or value.startswith("/") or _DRIVE_RE.match(value):
         raise ValueError(f"unsafe model file path: {value!r}")
     path = PurePosixPath(value)
-    if path.is_absolute() or path.as_posix() != value:
+    if path.is_absolute() or path.as_posix() != value or not path.parts:
         raise ValueError(f"non-canonical model file path: {value!r}")
     if any(part in ("", ".", "..") for part in path.parts):
         raise ValueError(f"unsafe model file path: {value!r}")
@@ -285,10 +285,15 @@ class ModelStore:
                     raw_name = info.filename[:-1] if info.is_dir() and info.filename.endswith("/") else info.filename
                     relative = _safe_relative_path(raw_name)
                     mode = info.external_attr >> 16
-                    if stat.S_ISLNK(mode):
+                    file_type = stat.S_IFMT(mode)
+                    if file_type == stat.S_IFLNK:
                         raise ValueError(f"symlink entry is forbidden: {info.filename!r}")
-                    if mode and not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+                    if file_type not in (0, stat.S_IFREG, stat.S_IFDIR):
                         raise ValueError(f"special archive entry is forbidden: {info.filename!r}")
+                    if info.is_dir() and file_type not in (0, stat.S_IFDIR):
+                        raise ValueError(f"directory entry has a non-directory type: {info.filename!r}")
+                    if not info.is_dir() and file_type == stat.S_IFDIR:
+                        raise ValueError(f"file entry has a directory type: {info.filename!r}")
                     if info.is_dir():
                         continue
                     if info.flag_bits & 0x1:
