@@ -90,10 +90,18 @@ class OnnxWordDetector:
         cache_dir: Optional[Path] = None,
         policy: Optional[str] = None,
         remote_authorized: Optional[bool] = None,
+        model_store_root: Optional[Path] = None,
+        model_revision: Optional[str] = None,
+        model_file: str = "model.onnx",
     ):
         self.model_id = model_id
         self.min_confidence = min_confidence
         self.cache_dir = cache_dir
+        self.model_store_root = Path(model_store_root) if model_store_root is not None else None
+        self.model_revision = model_revision
+        self.model_file = model_file
+        if self.model_store_root is not None and not self.model_revision:
+            raise ValueError("model_revision is required when model_store_root is configured")
         # سياسة الوصول: بارامتر > بيئة > LOCAL_ONLY (الافتراضي — بلا شبكة)
         self.policy = ModelAccessPolicy.resolve(policy, remote_authorized)
 
@@ -137,6 +145,12 @@ class OnnxWordDetector:
         فورًا بلا أي محاولة شبكة — منع إعادة المحاولة البعيدة عند نقص
         الخزنة (OCR-05/#79). REMOTE_DISABLED يمنع الشبكة حتى مع التصريح.
         """
+        if self.model_store_root is not None:
+            from ocr_core.model_store import ModelStore
+            return ModelStore(self.model_store_root).get_verified_file(
+                self.model_id, self.model_revision, self.model_file
+            )
+
         try:
             from huggingface_hub import hf_hub_download
         except ImportError:
@@ -168,6 +182,15 @@ class OnnxWordDetector:
 
     def has_local_artifact(self) -> bool:
         """هل الأثر مخزّن محليًا؟ فحص بلا شبكة وبلا onnxruntime."""
+        if self.model_store_root is not None:
+            try:
+                from ocr_core.model_store import ModelStore
+                ModelStore(self.model_store_root).get_verified_file(
+                    self.model_id, self.model_revision, self.model_file
+                )
+                return True
+            except (FileNotFoundError, ValueError, KeyError):
+                return False
         try:
             from huggingface_hub import hf_hub_download
         except ImportError:

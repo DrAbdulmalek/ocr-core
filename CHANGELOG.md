@@ -191,3 +191,10 @@
 - إصدار مرحلي: ensemble + router + telemetry + preprocess (scanner_fixer) +
   postprocess طبي + benchmarks كاملة (PR #6)، ونقل محرك القواعد والتصحيحات
   العربية من omni-medical-suite.
+
+
+## غير مُصدر — verified ModelStore engine integration
+
+- ربط OnnxWordDetector وJinaVLMEngine اختياريًا بخزنة ModelStore عبر model_store_root وmodel_revision غير القابل للتغيير.
+- ONNX يحل الملف المعلن فقط عبر get_verified_file؛ Jina يحل لقطة النموذج الكاملة عبر get_verified. فشل التحقق لا يؤدي إلى HF أو تنزيل بديل.
+- أضيفت اختبارات اصطناعية لمسارات الربط ومتطلبات revision؛ لا أوزان ولا بيانات مرضى.

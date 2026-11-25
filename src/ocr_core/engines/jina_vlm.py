@@ -71,18 +71,33 @@ class JinaVLMEngine:
         cache_dir: Optional[Path] = None,
         policy: Optional[str] = None,
         remote_authorized: Optional[bool] = None,
+        model_store_root: Optional[Path] = None,
+        model_revision: Optional[str] = None,
     ):
         self.model_id = model_id
         self.device = device
         self.prompt = prompt
         self.max_new_tokens = max_new_tokens
         self.cache_dir = cache_dir
+        self.model_store_root = Path(model_store_root) if model_store_root is not None else None
+        self.model_revision = model_revision
+        if self.model_store_root is not None and not self.model_revision:
+            raise ValueError("model_revision is required when model_store_root is configured")
         # سياسة الوصول: بارامتر > بيئة > LOCAL_ONLY (الافتراضي — بلا شبكة)
         self.policy = ModelAccessPolicy.resolve(policy, remote_authorized)
 
         self._model = None
         self._processor = None
         self._device = None
+
+    def _resolve_model_source(self) -> str:
+        """Resolve a verified local ModelStore snapshot or the HF model id."""
+        if self.model_store_root is None:
+            return self.model_id
+        from ocr_core.model_store import ModelStore
+        return str(ModelStore(self.model_store_root).get_verified(
+            self.model_id, self.model_revision
+        ))
 
     def _ensure_loaded(self):
         """تحميل كسول — لا يُحمّل حتى أول استخراج."""
@@ -104,7 +119,8 @@ class JinaVLMEngine:
         else:
             self._device = self.device
 
-        logger.info("تحميل %s على %s...", self.model_id, self._device)
+        model_source = self._resolve_model_source()
+        logger.info("تحميل %s على %s...", model_source, self._device)
 
         # ⚠️ trust_remote_code=True إلزامي لهذا النموذج (الكود المحلي فقط —
         #    السياسة تمنع جلب أثر جديد من الشبكة، لا تدقيق كود مخزّن سلفًا)
@@ -112,17 +128,17 @@ class JinaVLMEngine:
             trust_remote_code=True,
             cache_dir=str(self.cache_dir) if self.cache_dir else None,
         )
-        if not self.policy.allows_remote():
+        if self.model_store_root is not None or not self.policy.allows_remote():
             # LOCAL_ONLY/REMOTE_DISABLED (#79): الخزنة المحلية فقط —
             # نقص الأثر = فشل مغلق، بلا أي محاولة شبكة أو إعادة محاولة.
             try:
                 self._processor = AutoProcessor.from_pretrained(
-                    self.model_id,
+                    model_source,
                     local_files_only=True,
                     **common_kwargs,
                 )
                 self._model = AutoModelForCausalLM.from_pretrained(
-                    self.model_id,
+                    model_source,
                     dtype=torch.bfloat16,
                     local_files_only=True,
                     **common_kwargs,
@@ -138,16 +154,16 @@ class JinaVLMEngine:
         else:
             # EXPLICIT_REMOTE مصرّح: محاولة واحدة صريحة (قد تنزل الأثر)
             self._processor = AutoProcessor.from_pretrained(
-                self.model_id, **common_kwargs,
+                model_source, **common_kwargs,
             )
             self._model = AutoModelForCausalLM.from_pretrained(
-                self.model_id,
+                model_source,
                 dtype=torch.bfloat16,
                 **common_kwargs,
             ).to(self._device)
 
         self._model.eval()
-        logger.info("✅ %s جاهز", self.model_id)
+        logger.info("✅ %s جاهز", model_source)
 
     def extract(
         self,
