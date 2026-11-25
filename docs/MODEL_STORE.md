@@ -9,7 +9,7 @@ must be a separate reviewed change and must continue to obey
 
 ## Manifest format
 
-A ZIP import contains one root `model-manifest.json` and exactly the files
+The packaged schema is `ocr_core/config/model_manifest.schema.yaml`. A ZIP import contains one root `model-manifest.json` and exactly the files
 declared by that manifest. Example:
 
 ```json
