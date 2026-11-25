@@ -314,7 +314,7 @@ def test_page_synthesis_orders_arabic_regions_right_to_left():
         RegionRecord(bbox=(100, 10, 40, 20), text="الجهة اليمنى"),
     ]
     page, stage = _synthesize_regions(regions)
-    assert page.text == "الجهة اليمنى\\nالجهة اليسرى"
+    assert page.text == "الجهة اليمنى\nالجهة اليسرى"
     assert stage.detail["reading_direction"] == "rtl"
 
 
@@ -324,7 +324,7 @@ def test_page_synthesis_keeps_latin_regions_left_to_right():
         RegionRecord(bbox=(0, 10, 40, 20), text="LEFT"),
     ]
     page, stage = _synthesize_regions(regions)
-    assert page.text == "LEFT\\nRIGHT"
+    assert page.text == "LEFT\nRIGHT"
     assert stage.detail["reading_direction"] == "ltr"
 
 
@@ -334,4 +334,4 @@ def test_page_synthesis_keeps_lines_top_to_bottom_for_rtl():
         RegionRecord(bbox=(0, 10, 40, 20), text="السطر الأول"),
     ]
     page, _ = _synthesize_regions(regions)
-    assert page.text == "السطر الأول\\nالسطر الثاني"
+    assert page.text == "السطر الأول\nالسطر الثاني"
