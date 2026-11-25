@@ -272,3 +272,12 @@ def test_import_bounds_total_zip_entry_count(tmp_path):
             zf.writestr(f"directory-{index}/", b"")
     with pytest.raises(ValueError, match="too many ZIP entries"):
         ModelStore(tmp_path / "store").import_archive(archive, max_entries=3)
+
+
+def test_manifest_requires_schema_version_and_json_safe_metadata():
+    payload = _manifest_for({"weights.bin": b"x"}).to_dict()
+    payload.pop("schema_version")
+    with pytest.raises(ValueError, match="schema_version"):
+        ModelManifest.from_dict(payload)
+    with pytest.raises(ValueError, match="JSON-safe"):
+        _manifest_for({"weights.bin": b"x"}, metadata={"bad": object()})
