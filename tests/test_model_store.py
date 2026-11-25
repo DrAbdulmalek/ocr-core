@@ -231,7 +231,7 @@ def test_get_verified_file_only_returns_manifest_declared_paths(tmp_path):
 def test_manifest_json_schema_is_packaged():
     from importlib.resources import files
     schema = json.loads(
-        files("ocr_core.schemas").joinpath("model_manifest.schema.json").read_text(encoding="utf-8")
+        files("ocr_core").joinpath("config", "model_manifest.schema.yaml").read_text(encoding="utf-8")
     )
     assert schema["properties"]["schema_version"]["const"] == "1.0"
     assert set(schema["required"]) == {
