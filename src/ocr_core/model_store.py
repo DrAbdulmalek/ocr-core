@@ -82,6 +82,9 @@ class ModelManifest:
         paths = [item.path for item in self.files]
         if len(paths) != len(set(paths)):
             raise ValueError("manifest contains duplicate file paths")
+        reserved = {_MANIFEST_NAME, _STORED_MANIFEST_NAME}
+        if reserved.intersection(paths):
+            raise ValueError("manifest uses a reserved root metadata filename")
         if not isinstance(self.metadata, Mapping):
             raise ValueError("metadata must be a mapping")
 
