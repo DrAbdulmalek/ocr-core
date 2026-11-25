@@ -44,6 +44,7 @@ def test_onnx_store_requires_revision(tmp_path):
 def test_jina_resolves_verified_snapshot_directory(monkeypatch, tmp_path):
     from ocr_core.engines.jina_vlm import JinaVLMEngine
     expected = tmp_path / "verified" / "snapshot"
+    seen = {}
 
     class StoreStub:
         def __init__(self, root):
@@ -61,7 +62,9 @@ def test_jina_resolves_verified_snapshot_directory(monkeypatch, tmp_path):
     monkeypatch.setattr("ocr_core.model_store.ModelStore", StoreStub)
     engine = JinaVLMEngine(model_store_root=tmp_path / "store", model_revision="b" * 40)
     assert engine._resolve_model_source() == str(expected)
-    assert "lease_released" not in locals()
+    assert "lease_released" not in seen
+    engine.close()
+    assert seen["lease_released"] is True
 
 
 def test_jina_store_requires_revision(tmp_path):
