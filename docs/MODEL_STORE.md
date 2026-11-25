@@ -51,6 +51,20 @@ streaming into a private staging directory.
   hashes, and stored manifest.
 - `ModelStore.get_verified()` refuses missing or modified artifacts.
 
+## Lifecycle and concurrent use
+
+The read-only state API reports `NOT_REGISTERED`, `MISSING`, `CORRUPT`,
+`VERIFIED`, or `IN_USE`. A lease is acquired with
+`with store.lease(model_id, revision) as model_dir:`; the lock is created
+exclusively, so a second process cannot acquire the same model concurrently.
+The lease is removed on normal exit. If a process crashes, its lock remains
+and the state stays `IN_USE`; this is deliberately fail-closed. Inspect and
+resolve stale locks manually only after verifying that the owning process is
+gone. The store never guesses and never deletes a stale lock automatically.
+
+Use `get_verified_file()` to resolve a file only if it is declared by the
+manifest and the complete artifact passes integrity verification.
+
 ## Explicit non-goals
 
 No network access, automatic model downloads, model execution, cache eviction,
