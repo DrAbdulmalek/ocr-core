@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from ocr_core.model_access import DEFAULT_MODEL_ACCESS_POLICY, ModelAccessPolicy
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_ID = "jinaai/jina-ocr-v1"
@@ -63,12 +65,14 @@ class JinaVLMEngine:
         prompt: str = DEFAULT_PROMPT,
         max_new_tokens: int = 4096,
         cache_dir: Optional[Path] = None,
+        access_policy: Optional[ModelAccessPolicy] = None,
     ):
         self.model_id = model_id
         self.device = device
         self.prompt = prompt
         self.max_new_tokens = max_new_tokens
         self.cache_dir = cache_dir
+        self.access_policy = access_policy or DEFAULT_MODEL_ACCESS_POLICY
 
         self._model = None
         self._processor = None
@@ -101,12 +105,14 @@ class JinaVLMEngine:
             self.model_id,
             trust_remote_code=True,
             cache_dir=str(self.cache_dir) if self.cache_dir else None,
+            local_files_only=self.access_policy.local_files_only,
         )
         self._model = AutoModelForCausalLM.from_pretrained(
             self.model_id,
             dtype=torch.bfloat16,
             trust_remote_code=True,
             cache_dir=str(self.cache_dir) if self.cache_dir else None,
+            local_files_only=self.access_policy.local_files_only,
         ).to(self._device)
 
         self._model.eval()
