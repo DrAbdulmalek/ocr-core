@@ -185,7 +185,11 @@ class ModelRegistry:
             raise ValueError("model registry manifests path must be a directory")
 
     def _prepare(self) -> None:
+        # Validate before mkdir: a symlinked root must not cause writes outside
+        # the configured store while preparing the registry.
+        self._validate_layout()
         self.root.mkdir(parents=True, exist_ok=True)
+        self._validate_layout()
         self.manifests_dir.mkdir(parents=True, exist_ok=True)
         self._validate_layout()
 
@@ -463,6 +467,8 @@ class ModelStore:
         guesses whether a process is dead and never removes stale locks itself.
         """
         manifest = self.registry.get(model_id, revision)
+        if self.root.is_symlink() or (self.root.exists() and not self.root.is_dir()):
+            raise ValueError("model store root must be a real directory")
         leases_dir = self.root / ".leases"
         leases_dir.mkdir(parents=True, exist_ok=True)
         if leases_dir.is_symlink():
