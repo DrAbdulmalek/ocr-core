@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://drabdulmalek.github.io/ocr-core/schemas/model_manifest.schema.yaml",
+  "$id": "urn:ocr-core:model-manifest:1.0",
   "title": "OCR Core Model Manifest",
   "description": "Offline model artifact inventory. License and provenance fields are declarations, not legal verification.",
   "type": "object",
