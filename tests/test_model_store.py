@@ -299,6 +299,7 @@ def test_verify_rejects_symlinked_artifacts_parent(tmp_path):
     files = {"weights.bin": b"verified"}
     manifest = _manifest_for(files)
     store_root = tmp_path / "store"
+    store_root.mkdir()
     store = ModelStore(store_root)
     external = tmp_path / "external-artifacts"
     external.mkdir()
