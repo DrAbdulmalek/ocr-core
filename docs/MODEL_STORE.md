@@ -16,7 +16,7 @@ declared by that manifest. Example:
 {
   "schema_version": "1.0",
   "model_id": "example/tiny-ocr",
-  "revision": "immutable-revision-or-commit",
+  "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "task": "ocr",
   "framework": "onnx",
   "license_id": "MIT",
