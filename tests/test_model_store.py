@@ -239,6 +239,36 @@ def test_manifest_json_schema_is_packaged():
         files("ocr_core").joinpath("config", "model_manifest.schema.yaml").read_text(encoding="utf-8")
     )
     assert schema["properties"]["schema_version"]["const"] == "1.0"
+    assert schema["properties"]["revision"]["pattern"] == "^[0-9a-f]{40,64}$"
     assert set(schema["required"]) == {
         "schema_version", "model_id", "revision", "task", "framework", "license_id", "files"
     }
+
+
+def test_model_state_reports_missing_and_corrupt_artifacts(tmp_path):
+    from ocr_core.model_store import ModelState
+
+    files = {"weights.bin": b"state"}
+    manifest = _manifest_for(files)
+    store = ModelStore(tmp_path / "store")
+    assert store.status(manifest.model_id, manifest.revision) is ModelState.NOT_REGISTERED
+    store.registry.register(manifest)
+    assert store.status(manifest.model_id, manifest.revision) is ModelState.MISSING
+    archive = _archive(tmp_path / "state.zip", manifest, files)
+    model_dir = store.import_archive(archive)
+    assert store.status(manifest.model_id, manifest.revision) is ModelState.VERIFIED
+    (model_dir / "weights.bin").write_bytes(b"tampered")
+    assert store.status(manifest.model_id, manifest.revision) is ModelState.CORRUPT
+
+
+def test_import_bounds_total_zip_entry_count(tmp_path):
+    files = {"weights.bin": b"x"}
+    manifest = _manifest_for(files)
+    archive = tmp_path / "many-entries.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("model-manifest.json", json.dumps(manifest.to_dict()))
+        zf.writestr("weights.bin", b"x")
+        for index in range(5):
+            zf.writestr(f"directory-{index}/", b"")
+    with pytest.raises(ValueError, match="too many ZIP entries"):
+        ModelStore(tmp_path / "store").import_archive(archive, max_entries=3)
