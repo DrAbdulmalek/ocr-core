@@ -74,6 +74,7 @@ class JinaVLMEngine:
         remote_authorized: Optional[bool] = None,
         model_store_root: Optional[Path] = None,
         model_revision: Optional[str] = None,
+        trust_remote_code: bool = False,
     ):
         self.model_id = model_id
         self.device = device
@@ -82,6 +83,7 @@ class JinaVLMEngine:
         self.cache_dir = cache_dir
         self.model_store_root = Path(model_store_root) if model_store_root is not None else None
         self.model_revision = model_revision
+        self.trust_remote_code = bool(trust_remote_code)
         if self.model_store_root is not None and not self.model_revision:
             raise ValueError("model_revision is required when model_store_root is configured")
         # سياسة الوصول: بارامتر > بيئة > LOCAL_ONLY (الافتراضي — بلا شبكة)
@@ -127,10 +129,10 @@ class JinaVLMEngine:
         model_source = self._resolve_model_source()
         logger.info("تحميل %s على %s...", model_source, self._device)
 
-        # ⚠️ trust_remote_code=True إلزامي لهذا النموذج (الكود المحلي فقط —
-        #    السياسة تمنع جلب أثر جديد من الشبكة، لا تدقيق كود مخزّن سلفًا)
+        # Custom model code is executable code. It is opt-in even for a
+        # hash-verified local snapshot; integrity is not a code-safety audit.
         common_kwargs: dict = dict(
-            trust_remote_code=True,
+            trust_remote_code=self.trust_remote_code,
             cache_dir=str(self.cache_dir) if self.cache_dir else None,
         )
         try:

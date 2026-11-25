@@ -168,7 +168,43 @@ def test_jina_engine_loads_verified_snapshot_without_remote_resolution(monkeypat
     assert seen["model"][0][0] == str(snapshot)
     assert seen["processor"][0][1]["local_files_only"] is True
     assert seen["model"][0][1]["local_files_only"] is True
+    assert seen["processor"][0][1]["trust_remote_code"] is False
+    assert seen["model"][0][1]["trust_remote_code"] is False
     assert seen["lease_entered"] is True
     assert "lease_released" not in seen
     engine.close()
     assert seen["lease_released"] is True
+
+
+def test_jina_custom_code_requires_explicit_opt_in(monkeypatch, tmp_path):
+    import sys
+    import types
+    from ocr_core.engines.jina_vlm import JinaVLMEngine
+
+    seen = []
+    class Model:
+        def to(self, device): return self
+        def eval(self): pass
+    class Processor:
+        @staticmethod
+        def from_pretrained(source, **kwargs):
+            seen.append(kwargs["trust_remote_code"])
+            return object()
+    class AutoModel:
+        @staticmethod
+        def from_pretrained(source, **kwargs):
+            seen.append(kwargs["trust_remote_code"])
+            return Model()
+    torch = types.ModuleType("torch")
+    torch.cuda = types.SimpleNamespace(is_available=lambda: False)
+    torch.bfloat16 = object()
+    transformers = types.ModuleType("transformers")
+    transformers.AutoProcessor = Processor
+    transformers.AutoModelForCausalLM = AutoModel
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setitem(sys.modules, "transformers", transformers)
+
+    engine = JinaVLMEngine(trust_remote_code=True)
+    engine._ensure_loaded()
+    assert seen == [True, True]
+    engine.close()

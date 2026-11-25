@@ -86,3 +86,13 @@ ModelStore lease for as long as its ONNX session or Jina model/processor is
 loaded. Call the engine's `close()` method when the engine is no longer in
 use; this releases the lease and clears loaded engine references. If model
 loading fails, the engine releases the lease before propagating the error.
+
+
+## Jina custom-code trust boundary
+
+Jina custom model code is executable Python. The engine therefore defaults
+`trust_remote_code=False`, including when a snapshot has passed ModelStore
+hash verification. Set `trust_remote_code=True` only after independently
+reviewing the exact model code and accepting its execution. A matching SHA-256
+proves byte integrity relative to the manifest; it does not prove that code
+is safe. ModelStore does not audit Python code.
