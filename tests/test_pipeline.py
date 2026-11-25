@@ -335,3 +335,59 @@ def test_page_synthesis_keeps_lines_top_to_bottom_for_rtl():
     ]
     page, _ = _synthesize_regions(regions)
     assert page.text == "السطر الأول\nالسطر الثاني"
+
+
+# ----------------------------------------------------------------------
+# recognition provenance propagation
+# ----------------------------------------------------------------------
+class ProvenanceEngine(FakeEngine):
+    def process_image(self, image_path) -> OCRResult:
+        self.calls.append(Path(image_path))
+        return OCRResult(
+            text=self._text,
+            engine=self.name,
+            confidence=0.0,
+            processing_time=0.012,
+            meta={
+                "model_id": "synthetic/test-engine",
+                "revision": "a" * 40,
+                "artifact_sha256": "b" * 64,
+                "execution_mode": "local",
+            },
+        )
+
+
+def test_full_page_pipeline_preserves_engine_provenance(tmp_path):
+    pipe = DocumentPipeline(engine=ProvenanceEngine("نص عربي"), preprocess=False)
+    result = pipe.process_image(_png(tmp_path))
+    page = result.pages[0]
+    provenance = page.meta["recognition"]
+    assert provenance["engine"] == "fake"
+    assert provenance["confidence"] == 0.0
+    assert provenance["confidence_known"] is False
+    assert provenance["meta"]["model_id"] == "synthetic/test-engine"
+    assert provenance["meta"]["revision"] == "a" * 40
+    assert provenance["meta"]["execution_mode"] == "local"
+    assert page.meta["reading_direction"] == "rtl"
+    assert page.meta["region_count"] == 1
+
+
+def test_region_pipeline_preserves_each_region_provenance(tmp_path):
+    regions = [
+        RegionRecord(bbox=(0, 0, 60, 20), text=""),
+        RegionRecord(bbox=(0, 20, 60, 20), text=""),
+    ]
+    pipe = DocumentPipeline(
+        engine=ProvenanceEngine("نص المنطقة"),
+        preprocess=False,
+        layout_provider=lambda image_path, mode: list(regions),
+    )
+    result = pipe.process_image(_png(tmp_path))
+    page = result.pages[0]
+    assert len(page.regions) == 2
+    for region in page.regions:
+        assert region.meta["recognition"]["meta"]["model_id"] == "synthetic/test-engine"
+        assert region.meta["recognition"]["confidence_known"] is False
+    aggregated = page.meta["recognition"]["meta"]["regions"]
+    assert len(aggregated) == 2
+    assert all(item["meta"]["revision"] == "a" * 40 for item in aggregated)
