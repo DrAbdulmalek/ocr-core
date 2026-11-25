@@ -52,6 +52,12 @@ def test_manifest_rejects_unsafe_paths(bad_path):
         ModelFile(path=bad_path, size_bytes=1, sha256="0" * 64)
 
 
+@pytest.mark.parametrize("reserved", ["manifest.json", "model-manifest.json"])
+def test_manifest_rejects_reserved_root_filenames(reserved):
+    with pytest.raises(ValueError, match="reserved"):
+        _manifest_for({reserved: b"not-allowed"})
+
+
 def test_manifest_rejects_bad_digest_and_duplicate_paths():
     with pytest.raises(ValueError):
         ModelFile(path="weights.bin", size_bytes=1, sha256="not-a-hash")
