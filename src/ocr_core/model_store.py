@@ -82,8 +82,12 @@ class ModelManifest:
             raise ValueError(f"unsupported model manifest schema: {self.schema_version!r}")
         if not _REVISION_RE.fullmatch(self.revision):
             raise ValueError("revision must be an immutable 40-64 character lowercase commit SHA")
-        if not self.files:
-            raise ValueError("manifest must declare at least one model file")
+        if not isinstance(self.files, (tuple, list)):
+            raise ValueError("manifest files must be a sequence of ModelFile entries")
+        files = tuple(self.files)
+        if not files or any(not isinstance(item, ModelFile) for item in files):
+            raise ValueError("manifest must declare at least one ModelFile entry")
+        object.__setattr__(self, "files", files)
         paths = [item.path for item in self.files]
         if len(paths) != len(set(paths)):
             raise ValueError("manifest contains duplicate file paths")
@@ -92,6 +96,13 @@ class ModelManifest:
             raise ValueError("manifest uses a reserved root metadata filename")
         if not isinstance(self.metadata, Mapping):
             raise ValueError("metadata must be a mapping")
+        try:
+            metadata = json.loads(json.dumps(
+                dict(self.metadata), ensure_ascii=False, sort_keys=True, allow_nan=False
+            ))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("metadata must contain JSON-safe values only") from exc
+        object.__setattr__(self, "metadata", metadata)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -113,6 +124,8 @@ class ModelManifest:
         unknown = set(value) - allowed
         if unknown:
             raise ValueError(f"unknown manifest fields: {sorted(unknown)}")
+        if "schema_version" not in value:
+            raise ValueError("manifest schema_version is required")
         raw_files = value.get("files")
         if not isinstance(raw_files, list):
             raise ValueError("manifest files must be a list")
@@ -128,7 +141,7 @@ class ModelManifest:
             framework=value.get("framework"),
             license_id=value.get("license_id"),
             files=tuple(files),
-            schema_version=value.get("schema_version", "1.0"),
+            schema_version=value["schema_version"],
             metadata=value.get("metadata", {}),
         )
 
