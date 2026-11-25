@@ -387,6 +387,13 @@ class ModelStore:
             if stage is not None:
                 shutil.rmtree(stage, ignore_errors=True)
 
+    def get_verified(self, model_id: str, revision: str) -> Path:
+        """Return a model directory only when its complete manifest verifies."""
+        manifest = self.registry.get(model_id, revision)
+        if not self.verify(manifest):
+            raise ValueError(f"model artifact is missing or failed integrity verification: {model_id}@{revision}")
+        return self.artifact_path(manifest)
+
     def status(self, model_id: str, revision: str) -> ModelState:
         """Return a read-only lifecycle state; stale leases are never auto-cleared."""
         try:
