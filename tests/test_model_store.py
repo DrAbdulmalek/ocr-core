@@ -58,6 +58,11 @@ def test_manifest_rejects_reserved_root_filenames(reserved):
         _manifest_for({reserved: b"not-allowed"})
 
 
+def test_manifest_rejects_mutable_revision_names():
+    with pytest.raises(ValueError, match="immutable"):
+        _manifest_for({"weights.bin": b"x"}, revision="main")
+
+
 def test_manifest_rejects_bad_digest_and_duplicate_paths():
     with pytest.raises(ValueError):
         ModelFile(path="weights.bin", size_bytes=1, sha256="not-a-hash")
