@@ -165,13 +165,14 @@ class JinaVLMEngine:
         )
 
     def extract_with_confidence(self, image_path: str) -> dict:
-        """jina-ocr-v1 لا يعيد confidences — نعيد عنصرًا وهميًا للتوافق."""
+        """Return an explicit unknown confidence; Jina exposes no calibrated score."""
         result = self.extract(image_path)
         return {
             "text": result.markdown,
-            "confidence": 0.9,        # ثقة ثابتة (لا تتوفر درجة حقيقية)
+            "confidence": 0.0,  # 0.0 is the repository-wide sentinel for unknown.
+            "confidence_known": False,
             "engine": self.name,
-            "note": "VLM engine — no per-word confidence available",
+            "note": "VLM engine — no calibrated or per-word confidence available",
         }
 
 
