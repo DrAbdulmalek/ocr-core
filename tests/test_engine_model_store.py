@@ -208,3 +208,76 @@ def test_jina_custom_code_requires_explicit_opt_in(monkeypatch, tmp_path):
     engine._ensure_loaded()
     assert seen == [True, True]
     engine.close()
+
+
+def test_onnx_failed_session_creation_releases_store_lease(monkeypatch, tmp_path):
+    import sys
+    import types
+    from ocr_core.preprocess.word_detector import OnnxWordDetector
+
+    seen = {"released": False}
+    model_path = tmp_path / "model.onnx"
+    class StoreStub:
+        def __init__(self, root): pass
+        @contextmanager
+        def lease(self, model_id, revision):
+            try:
+                yield model_path.parent
+            finally:
+                seen["released"] = True
+        def get_verified_file(self, model_id, revision, relative_path):
+            return model_path
+    class Options:
+        graph_optimization_level = None
+        intra_op_num_threads = 0
+    class Runtime(types.ModuleType):
+        SessionOptions = Options
+        GraphOptimizationLevel = types.SimpleNamespace(ORT_ENABLE_ALL=1)
+        @staticmethod
+        def InferenceSession(path, **kwargs):
+            raise RuntimeError("synthetic ONNX load failure")
+    monkeypatch.setattr("ocr_core.model_store.ModelStore", StoreStub)
+    monkeypatch.setitem(sys.modules, "onnxruntime", Runtime("onnxruntime"))
+    detector = OnnxWordDetector(
+        model_store_root=tmp_path / "store",
+        model_revision="e" * 40,
+    )
+    with pytest.raises(RuntimeError, match="synthetic ONNX load failure"):
+        detector._ensure_loaded()
+    assert seen["released"] is True
+
+
+def test_jina_failed_model_load_releases_store_lease(monkeypatch, tmp_path):
+    import sys
+    import types
+    from ocr_core.engines.jina_vlm import JinaVLMEngine
+
+    seen = {"released": False}
+    class StoreStub:
+        def __init__(self, root): pass
+        @contextmanager
+        def lease(self, model_id, revision):
+            try:
+                yield tmp_path / "snapshot"
+            finally:
+                seen["released"] = True
+    class Processor:
+        @staticmethod
+        def from_pretrained(source, **kwargs):
+            raise RuntimeError("synthetic Jina load failure")
+    torch = types.ModuleType("torch")
+    torch.cuda = types.SimpleNamespace(is_available=lambda: False)
+    torch.bfloat16 = object()
+    transformers = types.ModuleType("transformers")
+    transformers.AutoProcessor = Processor
+    transformers.AutoModelForCausalLM = object()
+    monkeypatch.setattr("ocr_core.model_store.ModelStore", StoreStub)
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setitem(sys.modules, "transformers", transformers)
+    engine = JinaVLMEngine(
+        model_store_root=tmp_path / "store",
+        model_revision="f" * 40,
+    )
+    with pytest.raises(RuntimeError, match="synthetic Jina load failure"):
+        engine._ensure_loaded()
+    assert seen["released"] is True
