@@ -4,8 +4,9 @@
 
 This is a local-only foundation for model inventory and artifact integrity.
 It does not download, resolve, execute, or activate a model. Engine integration
-must be a separate reviewed change and must continue to obey
-`ocr_core.model_policy` (LOCAL_ONLY by default).
+must be a separate reviewed change and remain offline by default with explicit
+authorization for any remote access. The proposed `ocr_core.model_policy`
+implementation is tracked separately in PR #81 and is not included here.
 
 ## Manifest format
 
