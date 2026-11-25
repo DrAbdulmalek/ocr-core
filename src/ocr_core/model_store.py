@@ -14,9 +14,11 @@ import shutil
 import stat
 import tempfile
 import zipfile
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 _MANIFEST_NAME = "model-manifest.json"
 _STORED_MANIFEST_NAME = "manifest.json"
@@ -136,6 +138,16 @@ class ModelManifest:
     def storage_key(self) -> str:
         identity = (self.model_id + "\0" + self.revision).encode("utf-8")
         return hashlib.sha256(identity).hexdigest()
+
+
+class ModelState(str, Enum):
+    """Conservative local lifecycle state derived from registry, integrity, and lease."""
+
+    NOT_REGISTERED = "NOT_REGISTERED"
+    MISSING = "MISSING"
+    CORRUPT = "CORRUPT"
+    VERIFIED = "VERIFIED"
+    IN_USE = "IN_USE"
 
 
 class ModelRegistry:
@@ -375,12 +387,61 @@ class ModelStore:
             if stage is not None:
                 shutil.rmtree(stage, ignore_errors=True)
 
-    def get_verified(self, model_id: str, revision: str) -> Path:
-        """Return a model directory only when its complete manifest verifies."""
-        manifest = self.registry.get(model_id, revision)
+    def status(self, model_id: str, revision: str) -> ModelState:
+        """Return a read-only lifecycle state; stale leases are never auto-cleared."""
+        try:
+            manifest = self.registry.get(model_id, revision)
+        except FileNotFoundError:
+            return ModelState.NOT_REGISTERED
+        artifact = self.artifact_path(manifest)
+        if not artifact.exists():
+            return ModelState.MISSING
         if not self.verify(manifest):
-            raise ValueError(f"model artifact is missing or failed integrity verification: {model_id}@{revision}")
-        return self.artifact_path(manifest)
+            return ModelState.CORRUPT
+        lock = self.root / ".leases" / (manifest.storage_key + ".lock")
+        if lock.is_symlink():
+            raise ValueError("refusing symlinked model lease")
+        if lock.exists():
+            return ModelState.IN_USE
+        return ModelState.VERIFIED
+
+    @contextmanager
+    def lease(self, model_id: str, revision: str) -> Iterator[Path]:
+        """Hold an exclusive process-safe lease while a verified model is in use.
+
+        A process crash leaves a stale lock intentionally. The store never
+        guesses whether a process is dead and never removes stale locks itself.
+        """
+        manifest = self.registry.get(model_id, revision)
+        model_dir = self.get_verified(model_id, revision)
+        leases_dir = self.root / ".leases"
+        leases_dir.mkdir(parents=True, exist_ok=True)
+        if leases_dir.is_symlink():
+            raise ValueError("model leases directory must not be a symlink")
+        lock = leases_dir / (manifest.storage_key + ".lock")
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        lock_stat = os.fstat(fd)
+        try:
+            os.write(fd, (str(os.getpid()) + "\\n").encode("ascii"))
+            os.fsync(fd)
+            yield model_dir
+        finally:
+            os.close(fd)
+            try:
+                current = lock.lstat()
+                if (current.st_dev, current.st_ino) == (lock_stat.st_dev, lock_stat.st_ino):
+                    lock.unlink()
+            except FileNotFoundError:
+                pass
+
+    def get_verified_file(self, model_id: str, revision: str, relative_path: str) -> Path:
+        """Resolve one declared file only after the complete model verifies."""
+        relative = _safe_relative_path(relative_path)
+        manifest = self.registry.get(model_id, revision)
+        if relative_path not in {item.path for item in manifest.files}:
+            raise KeyError(f"file is not declared by the model manifest: {relative_path}")
+        model_dir = self.get_verified(model_id, revision)
+        return model_dir.joinpath(*relative.parts)
 
 
-__all__ = ["ModelFile", "ModelManifest", "ModelRegistry", "ModelStore"]
+__all__ = ["ModelFile", "ModelManifest", "ModelRegistry", "ModelState", "ModelStore"]
