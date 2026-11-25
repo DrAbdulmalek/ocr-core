@@ -278,12 +278,16 @@ class ModelStore:
         max_file_size: int = 1024 * 1024 * 1024,
         max_compression_ratio: float = 200.0,
         max_manifest_size: int = 1024 * 1024,
+        max_entries: int = 1024,
     ) -> Path:
         """Import a local ZIP only after strict validation; never accesses network."""
         archive = Path(archive_path)
         if archive.is_symlink() or not archive.is_file():
             raise ValueError("archive must be an existing regular file, not a symlink")
-        if max_files < 1 or max_total_size < 1 or max_file_size < 1 or max_compression_ratio < 1:
+        if (
+            max_files < 1 or max_total_size < 1 or max_file_size < 1
+            or max_compression_ratio < 1 or max_manifest_size < 1 or max_entries < 1
+        ):
             raise ValueError("archive limits must be positive")
 
         self.root.mkdir(parents=True, exist_ok=True)
@@ -297,9 +301,12 @@ class ModelStore:
         stage: Path | None = None
         try:
             with zipfile.ZipFile(archive, "r") as zf:
+                infos = zf.infolist()
+                if len(infos) > max_entries:
+                    raise ValueError("archive contains too many ZIP entries")
                 files: dict[str, zipfile.ZipInfo] = {}
                 total_size = 0
-                for info in zf.infolist():
+                for info in infos:
                     raw_name = info.filename[:-1] if info.is_dir() and info.filename.endswith("/") else info.filename
                     relative = _safe_relative_path(raw_name)
                     mode = info.external_attr >> 16
