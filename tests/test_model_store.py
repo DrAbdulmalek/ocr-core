@@ -165,5 +165,8 @@ def test_store_refuses_symlinked_root(tmp_path):
     actual.mkdir()
     link = tmp_path / "link"
     link.symlink_to(actual, target_is_directory=True)
+    files = {"weights.bin": b"safe"}
+    manifest = _manifest_for(files)
+    archive = _archive(tmp_path / "valid.zip", manifest, files)
     with pytest.raises(ValueError, match="symlink"):
-        ModelStore(link).import_archive(tmp_path / "missing.zip")
+        ModelStore(link).import_archive(archive)
