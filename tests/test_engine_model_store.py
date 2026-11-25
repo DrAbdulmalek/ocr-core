@@ -51,3 +51,83 @@ def test_jina_store_requires_revision(tmp_path):
     from ocr_core.engines.jina_vlm import JinaVLMEngine
     with pytest.raises(ValueError, match="model_revision"):
         JinaVLMEngine(model_store_root=tmp_path)
+
+
+def test_onnx_engine_loads_from_verified_store_path(monkeypatch, tmp_path):
+    import sys
+    import types
+    from ocr_core.preprocess.word_detector import OnnxWordDetector
+
+    model_path = tmp_path / "verified" / "weights.onnx"
+    seen = {}
+    class StoreStub:
+        def __init__(self, root): pass
+        def get_verified_file(self, model_id, revision, relative_path):
+            seen["store"] = (model_id, revision, relative_path)
+            return model_path
+    class Options:
+        graph_optimization_level = None
+        intra_op_num_threads = 0
+    class Runtime(types.ModuleType):
+        SessionOptions = Options
+        GraphOptimizationLevel = types.SimpleNamespace(ORT_ENABLE_ALL=1)
+        @staticmethod
+        def InferenceSession(path, **kwargs):
+            seen["session"] = (path, kwargs)
+            return object()
+    monkeypatch.setattr("ocr_core.model_store.ModelStore", StoreStub)
+    monkeypatch.setitem(sys.modules, "onnxruntime", Runtime("onnxruntime"))
+    detector = OnnxWordDetector(
+        model_store_root=tmp_path / "store",
+        model_revision="c" * 40,
+        model_file="weights.onnx",
+    )
+    detector._ensure_loaded()
+    assert detector._loaded is True
+    assert seen["session"][0] == str(model_path)
+    assert seen["store"][2] == "weights.onnx"
+
+
+def test_jina_engine_loads_verified_snapshot_without_remote_resolution(monkeypatch, tmp_path):
+    import sys
+    import types
+    from ocr_core.engines.jina_vlm import JinaVLMEngine
+
+    snapshot = tmp_path / "verified" / "jina"
+    seen = {"processor": [], "model": []}
+    class StoreStub:
+        def __init__(self, root): pass
+        def get_verified(self, model_id, revision): return snapshot
+    class Model:
+        def to(self, device): return self
+        def eval(self): pass
+    class Processor:
+        @staticmethod
+        def from_pretrained(source, **kwargs):
+            seen["processor"].append((source, kwargs))
+            return object()
+    class AutoModel:
+        @staticmethod
+        def from_pretrained(source, **kwargs):
+            seen["model"].append((source, kwargs))
+            return Model()
+    torch = types.ModuleType("torch")
+    torch.cuda = types.SimpleNamespace(is_available=lambda: False)
+    torch.bfloat16 = object()
+    transformers = types.ModuleType("transformers")
+    transformers.AutoProcessor = Processor
+    transformers.AutoModelForCausalLM = AutoModel
+    monkeypatch.setattr("ocr_core.model_store.ModelStore", StoreStub)
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setitem(sys.modules, "transformers", transformers)
+
+    engine = JinaVLMEngine(
+        model_store_root=tmp_path / "store",
+        model_revision="d" * 40,
+    )
+    engine._ensure_loaded()
+    assert engine._model is not None
+    assert seen["processor"][0][0] == str(snapshot)
+    assert seen["model"][0][0] == str(snapshot)
+    assert seen["processor"][0][1]["local_files_only"] is True
+    assert seen["model"][0][1]["local_files_only"] is True
