@@ -408,7 +408,10 @@ class ModelStore:
             return ModelState.MISSING
         if not self.verify(manifest):
             return ModelState.CORRUPT
-        lock = self.root / ".leases" / (manifest.storage_key + ".lock")
+        leases_dir = self.root / ".leases"
+        if leases_dir.is_symlink():
+            raise ValueError("model leases directory must not be a symlink")
+        lock = leases_dir / (manifest.storage_key + ".lock")
         if lock.is_symlink():
             raise ValueError("refusing symlinked model lease")
         if lock.exists():
@@ -423,7 +426,6 @@ class ModelStore:
         guesses whether a process is dead and never removes stale locks itself.
         """
         manifest = self.registry.get(model_id, revision)
-        model_dir = self.get_verified(model_id, revision)
         leases_dir = self.root / ".leases"
         leases_dir.mkdir(parents=True, exist_ok=True)
         if leases_dir.is_symlink():
@@ -432,6 +434,7 @@ class ModelStore:
         fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         lock_stat = os.fstat(fd)
         try:
+            model_dir = self.get_verified(model_id, revision)
             os.write(fd, (str(os.getpid()) + "\n").encode("ascii"))
             os.fsync(fd)
             yield model_dir
