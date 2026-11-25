@@ -12,10 +12,10 @@ import pytest
 from ocr_core.model_store import ModelFile, ModelManifest, ModelRegistry, ModelStore
 
 
-def _manifest_for(files: dict[str, bytes], **overrides) -> ModelManifest:
+def _manifest_for(file_contents: dict[str, bytes], **overrides) -> ModelManifest:
     entries = tuple(
         ModelFile(path=name, size_bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
-        for name, data in files.items()
+        for name, data in file_contents.items()
     )
     values = {
         "model_id": "example/tiny-ocr",
@@ -91,7 +91,7 @@ def test_offline_import_verifies_and_registers_model(tmp_path):
 
 def test_import_rejects_hash_mismatch_and_leaves_no_registered_model(tmp_path):
     files = {"weights.bin": b"actual"}
-    manifest = _manifest_for({"weights.bin": b"expected"})
+    manifest = _manifest_for({"weights.bin": b"expect"})
     archive = _archive(tmp_path / "bad.zip", manifest, files)
     store = ModelStore(tmp_path / "store")
     with pytest.raises(ValueError, match="SHA-256"):
