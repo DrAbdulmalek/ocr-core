@@ -96,3 +96,34 @@ hash verification. Set `trust_remote_code=True` only after independently
 reviewing the exact model code and accepting its execution. A matching SHA-256
 proves byte integrity relative to the manifest; it does not prove that code
 is safe. ModelStore does not audit Python code.
+
+
+## Local engine smoke test
+
+After importing a model archive and reviewing its license/provenance, run the
+smoke-test helper on the machine that will host OCR. It creates a blank
+synthetic image, prints only timings/counts, and never prints recognized text
+or accesses a network source:
+
+```bash
+python scripts/smoke_test_model_store.py \\
+  --store /path/to/model-store \\
+  --model-id example/model \\
+  --revision <40-to-64-char-commit-sha> \\
+  --engine onnx --model-file weights/model.onnx
+```
+
+Jina is optional and resource-intensive. Its weights are marked CC BY-NC 4.0
+in this repository; review the license and available memory before use. Jina
+custom Python code remains disabled unless explicitly opted into after code
+review:
+
+```bash
+python scripts/smoke_test_model_store.py --store /path/to/model-store \\
+  --model-id jinaai/jina-ocr-v1 --revision <commit-sha> --engine jina \\
+  --device cpu --trust-remote-code
+```
+
+The helper does not establish OCR accuracy: a blank synthetic image validates
+only model resolution, loading, and one inference call. It is not a clinical
+benchmark and must not be run on patient documents as part of this smoke test.
