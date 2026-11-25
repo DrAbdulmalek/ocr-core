@@ -127,3 +127,17 @@ python scripts/smoke_test_model_store.py --store /path/to/model-store \\
 The helper does not establish OCR accuracy: a blank synthetic image validates
 only model resolution, loading, and one inference call. It is not a clinical
 benchmark and must not be run on patient documents as part of this smoke test.
+
+
+## Model-specific license and capability notes (source review)
+
+The following are upstream model-card facts, not an endorsement for clinical use:
+
+- `PellelNitram/xournalpp-htr-word-detector`: model card lists MIT, ONNX, 448×448 grayscale input, and describes the output as word bounding boxes only (not transcription). It reports training/validation on IAM-style handwriting and explicitly warns that other writing styles may differ. It is therefore a detector component, not an Arabic medical handwriting recognizer.
+- `jinaai/jina-ocr-v1`: model card lists CC BY-NC 4.0, describes a 3B-parameter model, and its Transformers example requires `trust_remote_code=True`. Commercial use is not granted by that license. This project defaults custom code execution to false and requires an explicit caller opt-in after code review.
+
+Upstream cards:
+- https://huggingface.co/PellelNitram/xournalpp-htr-word-detector
+- https://huggingface.co/jinaai/jina-ocr-v1
+
+Neither card establishes accuracy on Arabic medical handwriting or Syrian clinical documents. Local evaluation on an appropriately authorized, privacy-preserving dataset remains mandatory before clinical use.
