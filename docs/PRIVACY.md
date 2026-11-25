@@ -71,3 +71,16 @@ The optional Arabic NER pipeline is local-only. Model resolution passes
 regex layer available. It must not fetch model weights from Hugging Face or
 any other network source. This setting does not replace owner review of any
 model files already present on disk.
+
+
+### تفسير نتائج self-test (تنبيه مهم)
+
+لا يجوز اعتبار غياب مطابقات Regex دليلًا على خلو السجلات من الأسماء أو
+كل أنواع المعلومات الشخصية. لذلك:
+- دون `--ner`: النتيجة `regex_only_incomplete_manual_review_required` ورمز خروج 2.
+- مع `--ner` لكن دون نموذج محلي محمّل: النتيجة غير مكتملة ورمز خروج 2؛ لا تنزيل شبكي.
+- مع NER محلي نشط ودون بقايا Regex: النتيجة تعني «لم تُكتشف بقايا ضمن هذه الطبقات» فقط، ورمز خروج 0، مع بقاء المراجعة البشرية إلزامية.
+- أي بقايا Regex تعطي رمز خروج 1.
+
+حتى NER النشط ليس ضمانًا شاملًا لإزالة PII؛ لا إعادة نشر قبل مراجعة المالك
+يدويًا للسجلات الـ319 وتوثيق القرار.
