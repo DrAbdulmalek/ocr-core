@@ -7,6 +7,27 @@
 > marathon-ocr-core[tesseract] @ git+https://github.com/DrAbdulmalek/ocr-core.git@v0.5.0
 > ```
 
+## غير مُصدر (فرع feat/privacy-ocr04-2026-11-25)
+
+### أُضيف
+- **وحدة الخصوصية `ocr_core.privacy` (issue #76 / OCR-04)**: استعادة وحدة
+  pii-scrubbing من مستودع `medical-ocr-training-hub` المؤرشف — مسح PII هجين
+  (طبقة Regex فورية: هواتف سوريا/السعودية/الإمارات/دولي، تواريخ ميلادية
+  وعربية-هندية، بريد، أرقام هوية 10–12 + طبقة NER عربية اختيارية بتحميل
+  مؤجَّل وتعطيل رشيق بلا شبكة) مع `scrub_records` لسجلات jsonl و
+  `check_residue` لفحص بقايا ما بعد الحجب، وثوابت السياسة
+  (`PRIVACY_POLICY`: بيانات المرضى أبدًا في git — HF private/gated أو
+  محليًا فقط). الفروق عن الأصل موثقة في ترويسة الوحدة (حذف
+  `logging.basicConfig`، لا نموذج يُحمَّل عند الاستيراد/الاختبارات).
+- **اختبارات الوحدة**: `tests/test_privacy.py` (23 اختبارًا) — كلها بسجلات
+  اصطناعية خيالية حصرًا وفق قاعدة الوحدة نفسها.
+- **أدوات المالك (OCR-04)**: `scripts/hf_gate_dataset.py` — gating فوري
+  لمجموعة `arabic-medical-ocr-corrections` (gated=manual افتراضيًا أو
+  `--mode private`، توكن من `HF_TOKEN` فقط، بلا توكن يطبع خطوات الـUI)،
+  و`scripts/privacy_selftest.py` — اختبار السجلات الحقيقية على جهاز المالك
+  محليًا (عُدّادات بلا أي محتوى خام، تقرير JSON جاهز للإرفاق في #76)،
+  و`docs/PRIVACY.md` — سياسة الطبقة الخاصة وسجل قرارات المالك المعلقة.
+
 ## غير مُصدر (فرع feat/contract-gate-73)
 
 ### أُضيف
