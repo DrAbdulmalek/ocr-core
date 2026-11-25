@@ -281,3 +281,28 @@ def test_manifest_requires_schema_version_and_json_safe_metadata():
         ModelManifest.from_dict(payload)
     with pytest.raises(ValueError, match="JSON-safe"):
         _manifest_for({"weights.bin": b"x"}, metadata={"bad": object()})
+
+
+def test_registry_get_rejects_symlinked_manifests_directory_without_mutation(tmp_path):
+    root = tmp_path / "store"
+    root.mkdir()
+    external = tmp_path / "external-manifests"
+    external.mkdir()
+    (root / "manifests").symlink_to(external, target_is_directory=True)
+
+    registry = ModelRegistry(root)
+    with pytest.raises(ValueError, match="manifests directory must not be a symlink"):
+        registry.get("example/tiny-ocr", "a" * 40)
+
+
+def test_verify_rejects_symlinked_artifacts_parent(tmp_path):
+    files = {"weights.bin": b"verified"}
+    manifest = _manifest_for(files)
+    store_root = tmp_path / "store"
+    store = ModelStore(store_root)
+    external = tmp_path / "external-artifacts"
+    external.mkdir()
+    (external / manifest.storage_key).mkdir()
+    (store_root / "artifacts").symlink_to(external, target_is_directory=True)
+
+    assert store.verify(manifest) is False
