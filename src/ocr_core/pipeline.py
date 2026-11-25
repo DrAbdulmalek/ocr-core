@@ -131,6 +131,18 @@ def _regions_in_reading_order(
     return [region for line in lines for region in line]
 
 
+def _ocr_result_provenance(result: OCRResult) -> dict[str, Any]:
+    """Preserve engine/model diagnostics without changing the locked OCRResult API."""
+    return {
+        "engine": result.engine,
+        "confidence": result.confidence,
+        "confidence_known": result.confidence != 0.0,
+        "processing_time": result.processing_time,
+        "pages": result.pages,
+        "meta": dict(result.meta or {}),
+    }
+
+
 @dataclass
 class RegionRecord:
     """One layout region with its recognized text (if recognized)."""
@@ -462,6 +474,7 @@ class DocumentPipeline:
             regions[0].engine = whole_page.engine
             regions[0].confidence = whole_page.confidence
             regions[0].error = whole_page.error
+            regions[0].meta["recognition"] = _ocr_result_provenance(whole_page)
             return (
                 regions,
                 whole_page,
@@ -486,6 +499,7 @@ class DocumentPipeline:
             region.engine = result.engine
             region.confidence = result.confidence
             region.error = result.error
+            region.meta["recognition"] = _ocr_result_provenance(result)
             if result.error:
                 agg_errors.append(f"region {region.bbox}: {result.error}")
         combined_error = "; ".join(agg_errors) or None
@@ -496,6 +510,13 @@ class DocumentPipeline:
             confidence=0.0,  # cross-region confidences are not comparable
             processing_time=time.perf_counter() - start,
             error=combined_error,
+            meta={
+                "regions": [
+                    {"bbox": list(region.bbox), **region.meta["recognition"]}
+                    for region in regions
+                    if "recognition" in region.meta
+                ]
+            },
         )
         return regions, combined, StageResult(
             stage=PipelineStage.RECOGNITION,
@@ -529,6 +550,9 @@ class DocumentPipeline:
         page.engine = recognition.engine
         page.confidence = recognition.confidence
         page.error = recognition.error
+        page.meta["recognition"] = _ocr_result_provenance(recognition)
+        page.meta["reading_direction"] = direction
+        page.meta["region_count"] = len(regions)
         return StageResult(
             stage=PipelineStage.PAGE_SYNTHESIS,
             ok=True,
