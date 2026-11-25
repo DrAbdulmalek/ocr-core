@@ -195,3 +195,25 @@ class TestPolicy:
 
     def test_policy_references_the_dataset(self):
         assert PRIVACY_POLICY["dataset"] == "DrAbdulmalek/arabic-medical-ocr-corrections"
+
+
+def test_ner_model_resolution_is_local_only(monkeypatch):
+    """حتى عند طلب NER، لا يُسمح بتنزيل نموذج من الشبكة."""
+    import types
+
+    captured = {}
+    def fake_pipeline(task, **kwargs):
+        captured["task"] = task
+        captured.update(kwargs)
+        return lambda text: []
+
+    monkeypatch.setitem(
+        sys.modules,
+        "transformers",
+        types.SimpleNamespace(pipeline=fake_pipeline),
+    )
+    scrubber = HybridPIIScrubber(use_ner=True)
+    scrubber.scrub("نص اصطناعي لا يحتوي بيانات شخصية")
+    assert captured["task"] == "ner"
+    assert captured["model"] == scrubber.ner_model_name
+    assert captured["model_kwargs"] == {"local_files_only": True}

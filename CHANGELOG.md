@@ -186,3 +186,10 @@
 - إصدار مرحلي: ensemble + router + telemetry + preprocess (scanner_fixer) +
   postprocess طبي + benchmarks كاملة (PR #6)، ونقل محرك القواعد والتصحيحات
   العربية من omni-medical-suite.
+
+
+### إصلاح خصوصية — منع تنزيل NER الصامت
+
+- فرض `local_files_only=True` على تحميل نموذج NER العربي الاختياري.
+- غياب النموذج المحلي يعطّل NER برشاقة مع استمرار Regex؛ لا تنزيل شبكي.
+- اختبار اصطناعي يتحقق من تمرير قيد العمل المحلي.

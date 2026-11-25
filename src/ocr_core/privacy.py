@@ -164,6 +164,9 @@ class HybridPIIScrubber:
                 "ner",
                 model=self.ner_model_name,
                 aggregation_strategy="simple",
+                # لا تنزيل للنموذج إطلاقًا: NER محلي فقط، وفشل cache miss
+                # يعطّل الطبقة برشاقة بدل أي اتصال خارجي.
+                model_kwargs={"local_files_only": True},
             )
             self._ner_loaded = True
             logger.info("نموذج NER جاهز")

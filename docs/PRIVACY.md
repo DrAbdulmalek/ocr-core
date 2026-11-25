@@ -62,3 +62,12 @@ python3 scripts/privacy_selftest.py --records x.jsonl --out report.json --ner
 حذف `logging.basicConfig` (نظافة مكتبة)، إضافة `scrub_records` و
 `check_residue` وثوابت السياسة، وطبقة NER تحميل مؤجَّل معطلة افتراضيًا في
 CI/الاختبارات (لا شبكة). الاختبارات كلها بسجلات اصطناعية خيالية.
+
+
+## NER offline enforcement
+
+The optional Arabic NER pipeline is local-only. Model resolution passes
+`local_files_only=True`; a cache miss disables NER gracefully and keeps the
+regex layer available. It must not fetch model weights from Hugging Face or
+any other network source. This setting does not replace owner review of any
+model files already present on disk.
