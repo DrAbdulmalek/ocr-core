@@ -101,9 +101,12 @@ is safe. ModelStore does not audit Python code.
 ## Local engine smoke test
 
 After importing a model archive and reviewing its license/provenance, run the
-smoke-test helper on the machine that will host OCR. It creates a blank
-synthetic image, prints only timings/counts, and never prints recognized text
-or accesses a network source:
+smoke-test helper on the machine that will host OCR. It forces
+Hugging Face/Transformers offline environment flags before importing model
+libraries, creates a blank synthetic image, and prints separate model-load and
+inference timings, output counts, and process peak RSS. It never prints
+recognized text or performs a remote model fallback. This is an application-
+level offline guard, not an operating-system firewall:
 
 ```bash
 python scripts/smoke_test_model_store.py \\
