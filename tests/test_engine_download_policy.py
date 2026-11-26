@@ -16,6 +16,12 @@ from ocr_core.engines.paddle import PaddleEngine
 from ocr_core.model_policy import ModelArtifactMissingError
 
 
+@pytest.fixture(autouse=True)
+def _clear_model_policy_environment(monkeypatch):
+    monkeypatch.delenv("OCR_CORE_MODEL_POLICY", raising=False)
+    monkeypatch.delenv("OCR_CORE_REMOTE_AUTHORIZED", raising=False)
+
+
 def _fake_easyocr(monkeypatch):
     calls = []
     module = types.ModuleType("easyocr")
@@ -63,7 +69,10 @@ def test_easyocr_disables_downloads_by_default(monkeypatch):
 def test_easyocr_remote_download_requires_explicit_authorization(monkeypatch):
     calls = _fake_easyocr(monkeypatch)
 
-    EasyOCREngine(policy="EXPLICIT_REMOTE")._engine()
+    EasyOCREngine(
+        policy="EXPLICIT_REMOTE",
+        remote_authorized=False,
+    )._engine()
     EasyOCREngine(
         policy="EXPLICIT_REMOTE",
         remote_authorized=True,
@@ -161,7 +170,10 @@ def test_paddle_remote_resolution_requires_explicit_authorization(monkeypatch):
     )
 
     with pytest.raises(ModelArtifactMissingError):
-        PaddleEngine(policy="EXPLICIT_REMOTE")._engine()
+        PaddleEngine(
+            policy="EXPLICIT_REMOTE",
+            remote_authorized=False,
+        )._engine()
 
     PaddleEngine(
         policy="EXPLICIT_REMOTE",
