@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Protocol
@@ -90,15 +91,24 @@ class OnnxWordDetector:
         cache_dir: Optional[Path] = None,
         policy: Optional[str] = None,
         remote_authorized: Optional[bool] = None,
+        model_store_root: Optional[Path] = None,
+        model_revision: Optional[str] = None,
+        model_file: str = "model.onnx",
     ):
         self.model_id = model_id
         self.min_confidence = min_confidence
         self.cache_dir = cache_dir
+        self.model_store_root = Path(model_store_root) if model_store_root is not None else None
+        self.model_revision = model_revision
+        self.model_file = model_file
+        if self.model_store_root is not None and not self.model_revision:
+            raise ValueError("model_revision is required when model_store_root is configured")
         # سياسة الوصول: بارامتر > بيئة > LOCAL_ONLY (الافتراضي — بلا شبكة)
         self.policy = ModelAccessPolicy.resolve(policy, remote_authorized)
 
         self._session = None
         self._loaded = False
+        self._store_lease_stack = ExitStack()
 
     def _ensure_loaded(self):
         """تحميل النموذج كسولاً — لا يحمّل شيئًا حتى أول استدعاء."""
@@ -114,19 +124,21 @@ class OnnxWordDetector:
             )
 
         # حمّل الأثر من الخزنة المحلية — الشبكة فقط بتصريح صريح (#79)
-        model_path = self._resolve_model()
-
-        sess_options = ort.SessionOptions()
-        sess_options.graph_optimization_level = (
-            ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        )
-        sess_options.intra_op_num_threads = 4
-
-        self._session = ort.InferenceSession(
-            str(model_path),
-            sess_options=sess_options,
-            providers=["CPUExecutionProvider"],
-        )
+        try:
+            model_path = self._resolve_model()
+            sess_options = ort.SessionOptions()
+            sess_options.graph_optimization_level = (
+                ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            )
+            sess_options.intra_op_num_threads = 4
+            self._session = ort.InferenceSession(
+                str(model_path),
+                sess_options=sess_options,
+                providers=["CPUExecutionProvider"],
+            )
+        except BaseException:
+            self.close()
+            raise
         self._loaded = True
         logger.info("تم تحميل WordDetector من %s", self.model_id)
 
@@ -137,6 +149,17 @@ class OnnxWordDetector:
         فورًا بلا أي محاولة شبكة — منع إعادة المحاولة البعيدة عند نقص
         الخزنة (OCR-05/#79). REMOTE_DISABLED يمنع الشبكة حتى مع التصريح.
         """
+        if self.model_store_root is not None:
+            from ocr_core.model_store import ModelStore
+            store = ModelStore(self.model_store_root)
+            # Keep the artifact leased for the full lifetime of the loaded session.
+            self._store_lease_stack.enter_context(
+                store.lease(self.model_id, self.model_revision)
+            )
+            return store.get_verified_file(
+                self.model_id, self.model_revision, self.model_file
+            )
+
         try:
             from huggingface_hub import hf_hub_download
         except ImportError:
@@ -166,8 +189,24 @@ class OnnxWordDetector:
             )
             return Path(path)
 
+    def close(self) -> None:
+        """Release the ONNX session and any ModelStore lease held by it."""
+        self._session = None
+        self._loaded = False
+        self._store_lease_stack.close()
+        self._store_lease_stack = ExitStack()
+
     def has_local_artifact(self) -> bool:
         """هل الأثر مخزّن محليًا؟ فحص بلا شبكة وبلا onnxruntime."""
+        if self.model_store_root is not None:
+            try:
+                from ocr_core.model_store import ModelStore
+                ModelStore(self.model_store_root).get_verified_file(
+                    self.model_id, self.model_revision, self.model_file
+                )
+                return True
+            except (FileNotFoundError, ValueError, KeyError):
+                return False
         try:
             from huggingface_hub import hf_hub_download
         except ImportError:
