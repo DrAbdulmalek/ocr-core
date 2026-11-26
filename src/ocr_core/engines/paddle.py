@@ -7,15 +7,13 @@ the original omni constructor default.
 """
 from __future__ import annotations
 
-import logging
 import os
 import time
 from pathlib import Path
 from typing import Any, Optional
 
 from ocr_core.engines.base import OCREngine, OCRResult
-
-logger = logging.getLogger(__name__)
+from ocr_core.model_policy import ModelAccessPolicy, ModelArtifactMissingError
 
 # Arabic-optimized detection params — copied from omni PaddleOCREngine.DEFAULT_PARAMS
 DEFAULT_PARAMS = {
@@ -48,10 +46,15 @@ class PaddleEngine(OCREngine):
         max_text_length: int = 800,
         use_mp: bool = True,
         dpi: int = 200,
+        model_dir: Optional[Path] = None,
+        policy: Optional[str] = None,
+        remote_authorized: Optional[bool] = None,
     ) -> None:
         self.lang = lang
         self.use_gpu = use_gpu
         self.dpi = dpi
+        self.model_dir = Path(model_dir) if model_dir is not None else None
+        self.policy = ModelAccessPolicy.resolve(policy, remote_authorized)
         self._ocr = None
         self._import_error: str | None = None
         self._params = {
@@ -82,9 +85,20 @@ class PaddleEngine(OCREngine):
         except ImportError as exc:
             self._import_error = "paddleocr not installed (pip install .[paddle])"
             raise exc
-        init_params = {**self._params, **self._custom_model_config()}
-        self._ocr = PaddleOCR(**init_params)
+        model_config = self._custom_model_config()
+        if not model_config and not self.policy.allows_remote():
+            raise ModelArtifactMissingError(
+                "PaddleOCR detection/recognition models are not available in a "
+                "validated local model directory; no remote download was attempted"
+            )
+        # PaddleOCR has no download_enabled switch. Supplying both required
+        # inference directories prevents its implicit default-model download.
+        self._ocr = PaddleOCR(**{**self._params, **model_config})
         return self._ocr
+
+    def close(self) -> None:
+        """Release the in-memory PaddleOCR engine without touching model files."""
+        self._ocr = None
 
     def process_image(self, image_path) -> OCRResult:
         start = time.perf_counter()
@@ -204,15 +218,33 @@ class PaddleEngine(OCREngine):
         }
 
     def _custom_model_config(self) -> dict[str, str]:
-        custom_dir = _find_custom_model_dir()
+        custom_dir = self.model_dir or _find_custom_model_dir()
         if custom_dir is None:
             return {}
+
+        root = Path(custom_dir)
+        if root.is_symlink() or not root.is_dir():
+            raise ModelArtifactMissingError(
+                "PaddleOCR model directory must be an existing, non-symlink directory"
+            )
+
         config: dict[str, str] = {}
-        for kind, key in (("det", "det_model_dir"), ("rec", "rec_model_dir"), ("cls", "cls_model_dir")):
-            d = os.path.join(custom_dir, kind)
-            if os.path.isdir(d):
-                config[key] = d
-                logger.info("custom paddle model: %s", d)
+        # This adapter disables angle classification, so detection and
+        # recognition are the required model components. Validate the legacy
+        # Paddle inference pair before passing a path to PaddleOCR.
+        for kind, key in (("det", "det_model_dir"), ("rec", "rec_model_dir")):
+            model_path = root / kind
+            if model_path.is_symlink() or not model_path.is_dir():
+                raise ModelArtifactMissingError(
+                    f"PaddleOCR local {kind} model directory is missing or unsafe"
+                )
+            for filename in ("inference.pdmodel", "inference.pdiparams"):
+                artifact = model_path / filename
+                if artifact.is_symlink() or not artifact.is_file():
+                    raise ModelArtifactMissingError(
+                        f"PaddleOCR local {kind} model is incomplete"
+                    )
+            config[key] = str(model_path)
         return config
 
 
@@ -223,21 +255,14 @@ def _mean_confidence(lines: list[dict]) -> float:
     return round(sum(vals) / len(vals), 4)
 
 
-def _find_custom_model_dir() -> str | None:
+def _find_custom_model_dir() -> Path | None:
     env = os.environ.get("OCR_CORE_PADDLE_MODEL_DIR")
-    search = []
     if env:
-        search.append(Path(env))
-    search.extend(
-        [
-            Path(CUSTOM_MODEL_DIR).resolve(),
-            Path.cwd() / CUSTOM_MODEL_DIR,
-        ]
-    )
-    for path in search:
-        if path.is_dir():
-            return str(path)
-    return None
+        # A configured but invalid path must fail closed; do not silently
+        # ignore it and fall back to PaddleOCR's implicit model downloader.
+        return Path(env)
+    candidate = Path(CUSTOM_MODEL_DIR)
+    return candidate if candidate.exists() else None
 
 
 def _ensure_rgb(image):

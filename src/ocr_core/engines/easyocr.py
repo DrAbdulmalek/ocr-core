@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ocr_core.engines.base import OCREngine, OCRResult
+from ocr_core.model_policy import ModelAccessPolicy, ModelArtifactMissingError
 from ocr_core.rtl_utils import ArabicRTLFixer
 
 logger = logging.getLogger(__name__)
@@ -32,11 +33,18 @@ class EasyOCREngine(OCREngine):
         gpu: bool = False,
         batch_size: int = 4,
         enable_rtl_fix: bool = True,
+        model_storage_directory: Optional[Path] = None,
+        policy: Optional[str] = None,
+        remote_authorized: Optional[bool] = None,
     ) -> None:
         self.languages = languages if languages is not None else ["ar", "en"]
         self.gpu = gpu
         self.batch_size = batch_size
         self.enable_rtl_fix = enable_rtl_fix
+        self.model_storage_directory = (
+            Path(model_storage_directory) if model_storage_directory is not None else None
+        )
+        self.policy = ModelAccessPolicy.resolve(policy, remote_authorized)
         self._reader = None
         self._import_error: str | None = None
         self.rtl_fixer = ArabicRTLFixer()
@@ -55,12 +63,33 @@ class EasyOCREngine(OCREngine):
             except ImportError:
                 self._import_error = "easyocr not installed (pip install .[easyocr])"
                 raise
+            model_storage_directory = None
+            if self.model_storage_directory is not None:
+                if (
+                    self.model_storage_directory.is_symlink()
+                    or not self.model_storage_directory.is_dir()
+                ):
+                    raise ModelArtifactMissingError(
+                        "EasyOCR model_storage_directory must be an existing, "
+                        "non-symlink directory"
+                    )
+                model_storage_directory = str(self.model_storage_directory)
+
+            # EasyOCR otherwise downloads missing detection/recognition weights.
+            # Keep that disabled unless the caller explicitly authorizes remote
+            # model resolution through the shared OCR model policy.
             self._reader = easyocr.Reader(
                 lang_list=list(self.languages),
                 gpu=self.gpu,
+                model_storage_directory=model_storage_directory,
+                download_enabled=self.policy.allows_remote(),
                 verbose=False,
             )
         return self._reader
+
+    def close(self) -> None:
+        """Release the in-memory EasyOCR reader; model files remain untouched."""
+        self._reader = None
 
     # ------------------------------------------------------------------ OCREngine
     def process_image(self, image_path) -> OCRResult:
