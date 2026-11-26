@@ -165,13 +165,17 @@ def test_r15_flags_uncertain_words(proc):
 
 
 # ---------- R16 ----------
-def test_r16_separates_correct_vs_wrong(proc):
-    good = proc.process_text("هذا نص عربي سليم تمامًا بلا رموز غريبة.")
-    assert good["classification"] if False else True
-    assert good["correct"] != "" and good["wrong"] == ""
-    bad = proc.process_text("XYZ#$% @@@ ﷼﷼﷼ *** ???")
-    if bad["ratio"] < 0.85:
-        assert bad["wrong"] != "" and bad["correct"] == ""
+def test_r16_requires_visual_evidence_for_correctness(proc):
+    plain = proc.process_text("هذا نص عربي سليم تمامًا بلا رموز غريبة.")
+    assert plain["correct"] == "" and plain["wrong"] == ""
+    assert plain["uncertain"] != ""
+    assert plain["classification"] == "uncertain"
+    marked_correct = proc.process_text("✓ هذه ترجمة صحيحة.")
+    assert marked_correct["correct"] != "" and marked_correct["wrong"] == ""
+    assert marked_correct["classification"] == "correct"
+    marked_wrong = proc.process_text("✗ هذه ترجمة خاطئة.")
+    assert marked_wrong["wrong"] != "" and marked_wrong["correct"] == ""
+    assert marked_wrong["classification"] == "incorrect"
 
 
 # ---------- R17 ----------
@@ -202,10 +206,53 @@ def test_full_pipeline_metadata_structure(proc):
         assert key in meta
 
 
-def test_save_outputs_creates_correct_and_wrong_files(proc, tmp_path):
-    result = proc.process_text("نص سليم واضح ومنظم بشكل جيد تمامًا.")
+def test_save_outputs_preserves_verbatim_and_uncertain_files(proc, tmp_path):
+    source = "نص سليم واضح ومنظم بشكل جيد تمامًا."
+    result = proc.process_text(source)
     paths = proc.save_outputs(result, tmp_path, "sample")
     assert paths["metadata"].exists()
-    if result["correct"]:
-        assert paths["markdown"].exists()
+    assert paths["uncertain"].exists()
+    assert paths["verbatim"].exists()
+    assert paths["verbatim"].read_text(encoding="utf-8") == source
+    assert result["text_verbatim"] == source
+    assert result["text_normalized"] == result["markdown"]
+    assert paths["markdown"] is None
     assert paths["wrong"] is None
+
+
+def test_training_record_requires_explicit_traceable_evidence(proc):
+    candidate = proc.build_training_record(
+        source="source sentence",
+        correct="candidate correct translation",
+        incorrect="candidate incorrect translation",
+        evidence={"confidence": "high", "visual_marker": "check/x"},
+    )
+    assert candidate["status"] == "uncertain"
+    assert candidate["positive_example"] is None
+    assert candidate["candidate_positive_example"] == "candidate correct translation"
+    assert candidate["training_eligible"] is False
+
+    verified = proc.build_training_record(
+        source="source sentence",
+        correct="human-confirmed translation",
+        incorrect="candidate negative",
+        evidence={
+            "confidence": "high",
+            "visual_marker": "✓",
+            "label": "positive_example",
+            "source_reference": "document.pdf#page=3",
+            "evidence_confirmed": True,
+        },
+    )
+    assert verified["status"] == "verified"
+    assert verified["positive_example"] == "human-confirmed translation"
+    assert verified["training_eligible"] is True
+    assert verified["negative_example"] is None
+
+
+def test_ambiguous_x_marker_is_not_a_negative_label(proc):
+    result = proc.apply_visual_rules("medical text", {"detected": ["X"]})
+    assert result["status"] == "uncertain"
+    assert result["incorrect_markers"] == []
+    assert result["ambiguous_markers"] == ["X"]
+    assert result["x_warning"] == "X_REQUIRES_CONTEXT_CHECK"
